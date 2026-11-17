@@ -5,6 +5,7 @@ import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import org.thymeleaf.exceptions.TemplateEngineException;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
@@ -12,7 +13,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Default {@link PdfTemplateRenderer}: Thymeleaf resolves classpath HTML templates,
@@ -49,6 +52,16 @@ public class ThymeleafPdfTemplateRenderer implements PdfTemplateRenderer {
     private static final byte[] FONT_REGULAR_BYTES = loadFontBytes(FONT_REGULAR_RESOURCE);
     private static final byte[] FONT_BOLD_BYTES = loadFontBytes(FONT_BOLD_RESOURCE);
 
+    // Internal template used only by warmUp(); lives under its own prefix and is the only name its
+    // resolver accepts, so it can never shadow or be shadowed by a caller's templates.
+    private static final String WARMUP_TEMPLATE = "pdf-engine-warmup";
+    private static final String WARMUP_CLASSPATH_PREFIX = "pdf-template-engine/";
+    private static final String WARMUP_LABEL = "Warm-up";
+    private static final String HTML_SUFFIX = ".html";
+    private static final int WARMUP_RESOLVER_ORDER = 1;
+    private static final int CALLER_RESOLVER_ORDER = 2;
+    private static final long NANOS_PER_MILLI = 1_000_000L;
+
     private final TemplateEngine templateEngine;
 
     /**
@@ -59,15 +72,62 @@ public class ThymeleafPdfTemplateRenderer implements PdfTemplateRenderer {
      *                                is appended automatically
      */
     public ThymeleafPdfTemplateRenderer(final String templateClasspathPrefix) {
+        final ClassLoaderTemplateResolver warmUpResolver = newResolver(WARMUP_CLASSPATH_PREFIX);
+        warmUpResolver.setResolvablePatterns(Set.of(WARMUP_TEMPLATE));
+        warmUpResolver.setOrder(WARMUP_RESOLVER_ORDER);
+
+        final ClassLoaderTemplateResolver resolver = newResolver(templateClasspathPrefix);
+        resolver.setOrder(CALLER_RESOLVER_ORDER);
+
+        this.templateEngine = new TemplateEngine();
+        this.templateEngine.addTemplateResolver(warmUpResolver);
+        this.templateEngine.addTemplateResolver(resolver);
+    }
+
+    private static ClassLoaderTemplateResolver newResolver(final String prefix) {
         final ClassLoaderTemplateResolver resolver = new ClassLoaderTemplateResolver();
-        resolver.setPrefix(templateClasspathPrefix);
-        resolver.setSuffix(".html");
+        resolver.setPrefix(prefix);
+        resolver.setSuffix(HTML_SUFFIX);
         resolver.setTemplateMode(TemplateMode.HTML);
         resolver.setCharacterEncoding(CHARSET);
         resolver.setCacheable(true);
+        return resolver;
+    }
 
-        this.templateEngine = new TemplateEngine();
-        this.templateEngine.setTemplateResolver(resolver);
+    /**
+     * Renders a bundled, domain-free document exercising the same path real templates use
+     * (Thymeleaf expressions and iteration, A4 CSS layout, a table, both bundled font weights,
+     * PDF/UA tagging), so the first real render no longer pays the cold-start cost.
+     * Never throws.
+     */
+    @Override
+    public void warmUp() {
+        final long start = System.nanoTime();
+        try {
+            final byte[] pdf = renderWarmUpDocument();
+            log.info("[PDF-WARMUP] done | bytes={} | ms={}", pdf.length,
+                    (System.nanoTime() - start) / NANOS_PER_MILLI);
+        } catch (final PdfRenderException | TemplateEngineException e) {
+            log.warn("[PDF-WARMUP] failed — the first real PDF will be slow", e);
+        }
+    }
+
+    /**
+     * Renders the internal warm-up document.
+     *
+     * @return the rendered PDF
+     */
+    byte[] renderWarmUpDocument() {
+        return render(WARMUP_TEMPLATE, Map.of(
+                "title", WARMUP_LABEL,
+                "highlight", true,
+                "highlightLabel", WARMUP_LABEL,
+                "rows", List.of(warmUpRow("Riga uno", "1,00"), warmUpRow("Riga due", "2,00"),
+                        warmUpRow("Riga tre", "3,00"))));
+    }
+
+    private static Map<String, String> warmUpRow(final String label, final String value) {
+        return Map.of("label", label, "value", value);
     }
 
     /** {@inheritDoc} */

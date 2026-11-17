@@ -26,4 +26,15 @@ public interface PdfTemplateRenderer {
      * @throws PdfRenderException if template processing or PDF rendering fails
      */
     byte[] render(String templateName, Map<String, Object> context);
+
+    /**
+     * Pays the one-off cold-start cost (class loading, JIT, font parsing) ahead of the first
+     * real render, typically once at application startup. Never throws: a failure is logged
+     * by the implementation and the first real render simply stays slow.
+     *
+     * <p>The default does nothing, so lambdas and test doubles are unaffected.
+     */
+    default void warmUp() {
+        // no-op by default
+    }
 }

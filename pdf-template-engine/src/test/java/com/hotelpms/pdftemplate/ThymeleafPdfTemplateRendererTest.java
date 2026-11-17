@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ThymeleafPdfTemplateRendererTest {
@@ -42,6 +43,37 @@ class ThymeleafPdfTemplateRendererTest {
     void throwsPdfRenderExceptionForAMissingTemplate() {
         assertThatThrownBy(() -> renderer.render("does-not-exist", Map.of()))
                 .isInstanceOf(RuntimeException.class);
+    }
+
+    @Test
+    void warmUpDocumentIsAValidPdfWithADescription() throws IOException {
+        final ThymeleafPdfTemplateRenderer thymeleafRenderer = new ThymeleafPdfTemplateRenderer("templates/");
+
+        final byte[] pdf = thymeleafRenderer.renderWarmUpDocument();
+
+        assertThat(new String(pdf, 0, PDF_MAGIC_BYTES_LEN, StandardCharsets.ISO_8859_1)).isEqualTo(PDF_MAGIC);
+        try (PDDocument document = Loader.loadPDF(pdf)) {
+            assertThat(document.getDocumentCatalog().getMarkInfo().isMarked()).isTrue();
+            assertThat(document.getDocumentInformation().getSubject())
+                    .as("the warm-up document must itself be PDF/UA compliant (document description)")
+                    .isNotBlank();
+        }
+    }
+
+    @Test
+    void warmUpNeverThrowsAndLeavesCallerTemplatesWorking() {
+        assertThatCode(renderer::warmUp).doesNotThrowAnyException();
+
+        final byte[] pdf = renderer.render(MINIMAL_TEMPLATE, Map.of(TITLE_VAR, "After warm-up"));
+
+        assertThat(new String(pdf, 0, PDF_MAGIC_BYTES_LEN, StandardCharsets.ISO_8859_1)).isEqualTo(PDF_MAGIC);
+    }
+
+    @Test
+    void defaultWarmUpOfAnArbitraryRendererDoesNothing() {
+        final PdfTemplateRenderer lambdaRenderer = (name, context) -> new byte[0];
+
+        assertThatCode(lambdaRenderer::warmUp).doesNotThrowAnyException();
     }
 
     @Test
