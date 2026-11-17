@@ -10,3 +10,7 @@ spring:
 internal:
   hmac:
     secret: test-hmac-secret-minimum-32-characters-for-unit-tests
+
+pdf:
+  warm-up:
+    enabled: false

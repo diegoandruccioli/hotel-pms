@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="it">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${title}">Warm-up</title>
+    <meta name="description" th:content="'Documento interno di riscaldamento: ' + ${title}"/>
+    <meta name="subject" content="Warm-up"/>
+    <style>
+        @page { size: A4; margin: 2cm; }
+        body { font-family: 'Noto Sans', sans-serif; font-size: 9pt; color: #1a1a1a; }
+        .header { display: flex; justify-content: space-between; border-bottom: 1px solid #333;
+            padding-bottom: 8pt; margin-bottom: 12pt; }
+        h1 { font-size: 15pt; font-weight: bold; margin: 0; }
+        table.rows { width: 100%; border-collapse: collapse; margin-bottom: 8pt; }
+        table.rows th { text-align: left; font-weight: bold; border-bottom: 1px solid #333; padding: 3pt 4pt; }
+        table.rows td { padding: 3pt 4pt; border-bottom: 0.5px solid #ccc; }
+        table.rows td.amount, table.rows th.amount { text-align: right; }
+        .badge { font-weight: bold; background-color: #f3f4f6; padding: 2pt 6pt; }
+        .note { color: #666; }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1 th:text="${title}">Warm-up</h1>
+    <span class="badge" th:if="${highlight}" th:text="${highlightLabel}">Label</span>
+</div>
+<table class="rows" th:if="${not #lists.isEmpty(rows)}">
+    <caption>Righe di prova</caption>
+    <thead>
+    <tr>
+        <th scope="col">Voce</th>
+        <th scope="col" class="amount">Valore</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="row : ${rows}">
+        <td th:text="${row.label}">Voce</td>
+        <td class="amount" th:text="${row.value}">0,00</td>
+    </tr>
+    </tbody>
+</table>
+<p class="note" th:if="${#lists.isEmpty(rows)}">Nessuna riga.</p>
+<p class="note" th:unless="${highlight}">Nessuna evidenza.</p>
+</body>
+</html>
