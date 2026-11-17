@@ -2,6 +2,12 @@ package com.hotelpms.billing.service;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -17,6 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FatturaPaXsdValidatorTest {
 
     private static final String NS = "http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2";
+
+    private static final String DEAD_PROXY_HOST = "localhost";
+    private static final int DEAD_PROXY_PORT = 9;
 
     private final FatturaPaXsdValidator validator = new FatturaPaXsdValidator();
 
@@ -77,6 +86,35 @@ class FatturaPaXsdValidatorTest {
         final List<String> errors = validator.validate(xml);
 
         assertThat(errors).isNotEmpty();
+    }
+
+    /**
+     * Regression for the CI flake: the bundled xmldsig schema used to declare a DOCTYPE
+     * pointing at {@code http://www.w3.org/2001/XMLSchema.dtd}, so compiling the schema
+     * needed w3.org to be reachable. A dead HTTP proxy reproduces an unreachable w3.org
+     * deterministically; construction and validation must not depend on it.
+     */
+    @Test
+    void shouldCompileAndValidateWithoutAnyNetworkAccess() {
+        final ProxySelector original = ProxySelector.getDefault();
+        ProxySelector.setDefault(new ProxySelector() {
+            @Override
+            public List<Proxy> select(final URI uri) {
+                return List.of(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(DEAD_PROXY_HOST, DEAD_PROXY_PORT)));
+            }
+
+            @Override
+            public void connectFailed(final URI uri, final SocketAddress address, final IOException ex) {
+                // expected: nothing listens on the dead proxy
+            }
+        });
+        try {
+            final List<String> errors = new FatturaPaXsdValidator().validate(minimalValidFattura());
+
+            assertThat(errors).isEmpty();
+        } finally {
+            ProxySelector.setDefault(original);
+        }
     }
 
     /**

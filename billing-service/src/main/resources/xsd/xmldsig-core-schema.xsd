@@ -1,13 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE schema
-  PUBLIC "-//W3C//DTD XMLSchema 200102//EN" "http://www.w3.org/2001/XMLSchema.dtd"
- [
-   <!ATTLIST schema 
-     xmlns:ds CDATA #FIXED "http://www.w3.org/2000/09/xmldsig#">
-   <!ENTITY dsig 'http://www.w3.org/2000/09/xmldsig#'>
-   <!ENTITY % p ''>
-   <!ENTITY % s ''>
-  ]>
+<!-- hotel-pms: verbatim copy of the W3C XML-DSig schema (REC 2002-02-12) with one change: the DOCTYPE
+     (external XMLSchema.dtd + an unused internal subset: ATTLIST xmlns:ds, entities dsig/p/s) was removed so
+     compiling the schema never fetches anything from w3.org. xmlns:ds is declared on <schema> below. -->
 
 <!-- Schema for XML Signatures
     http://www.w3.org/2000/09/xmldsig#

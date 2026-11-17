@@ -29,7 +29,8 @@ import java.util.List;
  * schema {@code <xs:import>}s the W3C XML-DSig schema from a live
  * {@code http://www.w3.org} URL, which would make every XML generation
  * depend on an external site being reachable — {@link #resourceResolver()}
- * redirects that import to the bundled copy instead.
+ * redirects that import to the bundled copy instead. The bundled xmldsig copy has
+ * its DOCTYPE removed, so building the schema performs no network access at all.
  *
  * <p>{@link Schema} is thread-safe and built once; {@link Validator} is not,
  * so a fresh one is created per call (cheap — it wraps the pre-compiled
@@ -53,14 +54,18 @@ public class FatturaPaXsdValidator {
     public FatturaPaXsdValidator() {
         try {
             final SchemaFactory factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-            // No ACCESS_EXTERNAL_* restriction here: this factory only ever compiles
-            // the one bundled, hardcoded FATTURAPA_XSD classpath resource — trusted
-            // input, never derived from anything a caller supplies. Restricting it
-            // also blocks the <xs:import> of the xmldsig schema even though
-            // resourceResolver() below redirects it to a local file: the JDK's
-            // built-in implementation rejects the import's external systemId before
-            // ever consulting the resolver. The attacker-facing surface is the
-            // per-call Validator below, which processes the caller-supplied xml.
+            // External DTDs are closed: the bundled schemas carry no DOCTYPE, so nothing
+            // may be fetched from w3.org at construction (a DOCTYPE creeping back in
+            // fails fast here instead of only when the network is down). ACCESS_EXTERNAL_SCHEMA
+            // stays open on purpose: this factory only ever compiles the one bundled,
+            // hardcoded FATTURAPA_XSD classpath resource — trusted input, never derived
+            // from anything a caller supplies — and restricting it blocks the
+            // <xs:import> of the xmldsig schema even though resourceResolver() below
+            // redirects it to a local file: the JDK's built-in implementation rejects
+            // the import's external systemId before ever consulting the resolver. The
+            // attacker-facing surface is the per-call Validator below, which processes
+            // the caller-supplied xml.
+            factory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
             factory.setResourceResolver(resourceResolver());
             try (InputStream xsd = new ClassPathResource(FATTURAPA_XSD).getInputStream()) {
                 this.schema = factory.newSchema(new StreamSource(xsd));
