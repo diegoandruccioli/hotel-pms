@@ -165,14 +165,18 @@ class StayServiceImplRoomChangeTest {
                 });
 
         final StayInvoiceResolver stayInvoiceResolver = new StayInvoiceResolver(billingClient);
+        final CheckoutEmailTestPublisher checkoutEmails = new CheckoutEmailTestPublisher();
+        final StayNotificationCoordinator notificationCoordinator = new StayNotificationCoordinator(
+                notificationClient, guestClient, billingClient, hotelSettingsService, stayRepository,
+                checkoutEmails);
+        checkoutEmails.deliverTo(new StayCheckoutEmailListener(stayRepository, notificationCoordinator));
         stayService = new StayServiceImpl(
                 stayRepository, stayGuestRepository, stayMapper, guestClient, roomService, reservationService,
                 new StayCheckInValidator(guestClient, reservationService, roomService),
                 new StayBillingCoordinator(billingClient, roomService, stayRepository, reservationService,
                         ratePricingService, cityTaxAssessmentService, stayInvoiceResolver),
                 new StayAlloggiatiCoordinator(alloggiatiWebSenderService, hotelSettingsService, stayRepository),
-                new StayNotificationCoordinator(
-                        notificationClient, guestClient, billingClient, hotelSettingsService, stayRepository),
+                notificationCoordinator,
                 new StayReservationSync(reservationService, stayRepository),
                 gatewayEventsClient,
                 cityTaxAssessmentService,

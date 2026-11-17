@@ -240,7 +240,7 @@ public class StayServiceImpl implements StayService {
                 stayId, stay.getReservationId(), stay.getRoomId());
 
         stayReservationSync.updateReservationStatusAfterCheckOut(updatedStay.getReservationId());
-        stayNotificationCoordinator.sendCheckoutEmailIfPossible(updatedStay, invoice);
+        stayNotificationCoordinator.publishCheckoutCompleted(updatedStay, invoice);
         gatewayEventsClient.notify(new GatewayEventNotifyRequest(GatewayEventType.CHECK_OUT));
 
         return stayMapper.toDto(updatedStay);

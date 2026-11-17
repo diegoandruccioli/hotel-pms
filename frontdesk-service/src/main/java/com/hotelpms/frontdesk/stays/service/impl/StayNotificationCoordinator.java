@@ -16,6 +16,7 @@ import com.hotelpms.frontdesk.stays.service.HotelSettingsService;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,11 @@ import java.util.List;
  * Sends the checkout-summary transactional email (via notification-service), gated
  * by per-hotel settings. Failure never blocks check-out itself — it's recorded on
  * the {@link Stay} for staff retry via {@link StayServiceImpl#retryCheckoutEmail}.
+ *
+ * <p>At check-out the email is not sent inline: {@link #publishCheckoutCompleted} hands it
+ * to {@link StayCheckoutEmailListener}, which runs after the transaction commits, off the
+ * request thread (the invoice PDF alone can take 10+ seconds on a cold billing-service).
+ * Only the manual retry calls {@link #sendCheckoutEmailIfPossible} synchronously.
  */
 @Component
 @RequiredArgsConstructor
@@ -41,11 +47,23 @@ class StayNotificationCoordinator {
     private final BillingClient billingClient;
     private final HotelSettingsService hotelSettingsService;
     private final StayRepository stayRepository;
+    private final ApplicationEventPublisher eventPublisher;
+
+    /**
+     * Schedules the checkout email: publishes a {@link StayCheckedOutEvent} that
+     * {@link StayCheckoutEmailListener} handles after the surrounding transaction commits.
+     *
+     * @param stay    the just-checked-out stay
+     * @param invoice the invoice verified as settled during check-out
+     */
+    void publishCheckoutCompleted(final Stay stay, final InvoiceStatusResponse invoice) {
+        eventPublisher.publishEvent(new StayCheckedOutEvent(stay.getId(), stay.getHotelId(), invoice));
+    }
 
     /**
      * Sends the checkout email if enabled in hotel settings; records success or
      * failure on the stay either way (a Feign/DB failure never blocks check-out,
-     * which has already committed by the time this runs).
+     * which has already committed by the time the async listener runs this).
      *
      * @param stay    the just-checked-out stay
      * @param invoice the invoice verified as PAID during check-out
