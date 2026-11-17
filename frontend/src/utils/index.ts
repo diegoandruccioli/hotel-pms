@@ -4,4 +4,5 @@ export * from './domainStatus';
 export * from './toneStyles';
 export * from './errorMessage';
 export * from './format';
+export * from './guestName';
 export * from './passwordPolicy';

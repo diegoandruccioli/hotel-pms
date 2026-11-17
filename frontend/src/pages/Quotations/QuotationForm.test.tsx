@@ -196,7 +196,7 @@ describe('QuotationForm', () => {
     fireEvent.change(screen.getByLabelText('guests:search_guest_placeholder'), { target: { value: 'John' } });
     await waitFor(() => expect(guestService.searchGuests).toHaveBeenCalledWith('John'), { timeout: 1000 });
 
-    const suggestion = await screen.findByText('John Doe');
+    const suggestion = await screen.findByText('Doe John');
     fireEvent.click(suggestion);
 
     await waitFor(() => expect(screen.getByText('john@example.com')).toBeInTheDocument());
@@ -324,7 +324,7 @@ describe('QuotationForm', () => {
     await waitFor(() => expect(screen.getByLabelText('guests:search_guest_placeholder')).toBeInTheDocument());
 
     fireEvent.change(screen.getByLabelText('guests:search_guest_placeholder'), { target: { value: 'John' } });
-    const suggestion = await screen.findByText('John Doe');
+    const suggestion = await screen.findByText('Doe John');
     fireEvent.click(suggestion);
     await waitFor(() => expect(screen.getByText('john@example.com')).toBeInTheDocument());
 

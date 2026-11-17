@@ -51,7 +51,7 @@ const GUEST: GuestResponseDTO = {
 };
 
 const RESERVATION: ReservationResponse = {
-  id: 'r1', guestId: 'g1', guestFullName: 'John Doe', checkInDate: '2026-09-01',
+  id: 'r1', guestId: 'g1', guestFullName: 'Doe John', checkInDate: '2026-09-01',
   checkOutDate: '2026-09-03', status: 'CONFIRMED', expectedGuests: 2, lineItems: [],
   active: true, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z',
   confirmationEmailFailed: false,
@@ -145,9 +145,9 @@ describe('CommandPalette', () => {
     await waitFor(() => expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('John', 0, 5), {
       timeout: 1000,
     });
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
 
-    fireEvent.click(screen.getByText('John Doe'));
+    fireEvent.click(screen.getByText('Doe John'));
     expect(mockNavigate).toHaveBeenCalledWith('/guests', { state: { guestId: expect.any(String) } });
     expect(onClose).toHaveBeenCalled();
   });
@@ -203,11 +203,11 @@ describe('CommandPalette', () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValue(page([GUEST]) as never);
     renderWithQuery(<CommandPalette open onClose={vi.fn()} />);
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'John' } });
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument(), { timeout: 2000 });
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument(), { timeout: 2000 });
 
     fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } });
 
-    expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+    expect(screen.queryByText('Doe John')).not.toBeInTheDocument();
   });
 
   it('has no accessibility violations while open', async () => {

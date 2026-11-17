@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { MaterialIcon } from '../../components/MaterialIcon';
 import { M3Button, M3Card, M3TextField } from '../../components/m3';
 import type { GuestResponseDTO } from '../../types';
+import { formatGuestName } from '../../utils';
 
 const GuestSuggestionRow = memo(({ guest, onSelect }: { guest: GuestResponseDTO; onSelect: (guest: GuestResponseDTO) => void }) => {
   const handleClick = useCallback(() => onSelect(guest), [onSelect, guest]);
@@ -13,7 +14,7 @@ const GuestSuggestionRow = memo(({ guest, onSelect }: { guest: GuestResponseDTO;
         className="w-full text-left px-4 py-3 hover:bg-surface-variant transition-colors"
         onClick={handleClick}
       >
-        <p className="font-medium text-on-surface">{guest.firstName} {guest.lastName}</p>
+        <p className="font-medium text-on-surface">{formatGuestName(guest)}</p>
         <p className="text-sm text-on-surface-variant">{guest.email}</p>
       </button>
     </li>
@@ -75,7 +76,7 @@ export const QuotationRecipientSection = memo(({
         selectedGuest ? (
           <div className="p-4 border border-primary rounded-shape-md bg-primary/5 flex justify-between items-center">
             <div>
-              <p className="font-medium text-on-surface">{selectedGuest.firstName} {selectedGuest.lastName}</p>
+              <p className="font-medium text-on-surface">{formatGuestName(selectedGuest)}</p>
               <p className="text-sm text-on-surface-variant">{selectedGuest.email}</p>
             </div>
             <M3Button variant="text" icon="edit" onClick={onClearGuest}>{t('guests:btn_change')}</M3Button>

@@ -1,6 +1,7 @@
 package com.hotelpms.frontdesk.quotations.service.impl;
 
 import com.hotelpms.commonweb.paging.StablePaging;
+import com.hotelpms.commonweb.text.PersonNames;
 import com.hotelpms.internalauth.security.TenantContext;
 
 import com.hotelpms.frontdesk.client.GuestClient;
@@ -734,10 +735,10 @@ public class QuotationServiceImpl implements QuotationService {
             final Quotation quotation, final GuestResponse guest, final Map<UUID, RoomResponse> roomsById,
             final LocalDate today) {
         final String guestFullName = guest != null
-                ? guest.firstName() + " " + guest.lastName()
+                ? PersonNames.surnameFirst(guest.firstName(), guest.lastName())
                 : quotation.getGuestId() != null
                         ? "Unknown Guest"
-                        : quotation.getProspectFirstName() + " " + quotation.getProspectLastName();
+                        : PersonNames.surnameFirst(quotation.getProspectFirstName(), quotation.getProspectLastName());
         final QuotationStatus effectiveStatus = quotation.isExpiredOn(today)
                 ? QuotationStatus.EXPIRED : quotation.getStatus();
         final String prospectEmail = quotation.getGuestId() == null ? quotation.getProspectEmail() : null;

@@ -4,7 +4,7 @@ import { M3Avatar, M3Button, M3SideSheet, M3StatusChip } from '../../components/
 import { useFormatters } from '../../hooks';
 import { useGuestStayHistory } from '../../hooks/queries';
 import { useAuthStore } from '../../store';
-import { todayIsoDate } from '../../utils';
+import { formatGuestName, todayIsoDate } from '../../utils';
 import type { GuestResponseDTO } from '../../types';
 import type { IdentityDocumentResponseDTO } from '../../types/guest.types';
 import { DetailSection, InvoiceHistorySection, StayHistorySection } from './GuestHistorySections';
@@ -71,7 +71,7 @@ export const GuestDetailSheet = ({ guest, onClose, onEdit, onNewReservation }: G
   const handleEdit = useCallback(() => onEdit(guest), [onEdit, guest]);
   const handleNewReservation = useCallback(() => onNewReservation(guest), [onNewReservation, guest]);
 
-  const fullName = `${guest.firstName} ${guest.lastName}`;
+  const fullName = formatGuestName(guest);
   const locality = [guest.cap, guest.comune, guest.provincia && `(${guest.provincia})`].filter(Boolean).join(' ');
   const address = [guest.address, locality, guest.country].filter(Boolean).join(', ');
   const documents = guest.identityDocuments ?? [];

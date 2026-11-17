@@ -3,6 +3,7 @@ package com.hotelpms.billing.service.impl;
 import com.hotelpms.internalauth.security.CallerContext;
 import com.hotelpms.internalauth.security.TenantContext;
 
+import com.hotelpms.commonweb.text.PersonNames;
 import com.hotelpms.commonweb.csv.CsvWriter;
 import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.billing.client.GuestClient;
@@ -441,7 +442,7 @@ public class InvoiceServiceImpl implements InvoiceService {
      * results without one Feign call per row.
      *
      * @param guestIds the guest IDs to resolve (may be empty)
-     * @return a map of guestId to "First Last", missing entries omitted rather than
+     * @return a map of guestId to "Last First", missing entries omitted rather than
      *         failing the whole search (guest-service unavailable or guest deleted)
      */
     private Map<UUID, String> resolveGuestNames(final List<UUID> guestIds) {
@@ -450,7 +451,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         }
         return guestClient.getGuestsBatch(guestIds).stream()
                 .collect(Collectors.toMap((@NonNull GuestResponse gr) -> gr.id(),
-                        g -> (g.firstName() + " " + g.lastName()).trim(),
+                        g -> PersonNames.surnameFirst(g.firstName(), g.lastName()),
                         (first, second) -> first));
     }
 

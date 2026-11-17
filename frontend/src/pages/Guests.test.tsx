@@ -123,7 +123,7 @@ describe('Guests', () => {
     render(<Guests />);
 
     await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByText('Doe John')).toBeInTheDocument();
     });
     expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('', 0, 20, 'lastName,asc');
   });
@@ -181,7 +181,7 @@ describe('Guests', () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     expect(screen.queryByRole('menuitem', { name: 'delete' })).not.toBeInTheDocument();
   });
 
@@ -190,7 +190,7 @@ describe('Guests', () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     openRowMenu();
     expect(screen.getByRole('menuitem', { name: 'delete' })).toBeInTheDocument();
   });
@@ -200,7 +200,7 @@ describe('Guests', () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     expect(screen.queryByText('export_csv')).not.toBeInTheDocument();
   });
 
@@ -209,7 +209,7 @@ describe('Guests', () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     fireEvent.click(screen.getByText('export_csv'));
 
     expect(guestService.exportGuestsCsv).toHaveBeenCalledWith('');
@@ -220,12 +220,12 @@ describe('Guests', () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
 
     expect(screen.getByText('delete_guest_confirm')).toBeInTheDocument();
-    expect(screen.getByText('delete_guest_title:John Doe')).toBeInTheDocument();
+    expect(screen.getByText('delete_guest_title:Doe John')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'delete_guest_action' })).toBeInTheDocument();
   });
 
@@ -237,7 +237,7 @@ describe('Guests', () => {
     vi.mocked(guestService.deleteGuest).mockResolvedValueOnce(undefined);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     fireEvent.click(screen.getByRole('button', { name: 'delete_guest_action' }));
@@ -245,7 +245,7 @@ describe('Guests', () => {
     await waitFor(() => {
       expect(guestService.deleteGuest).toHaveBeenCalledWith('guest-1');
       expect(mockAddToast).toHaveBeenCalledWith('guest_deleted_success', 'success');
-      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+      expect(screen.queryByText('Doe John')).not.toBeInTheDocument();
     });
   });
 
@@ -254,7 +254,7 @@ describe('Guests', () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     expect(screen.getByText('delete_guest_confirm')).toBeInTheDocument();
@@ -271,7 +271,7 @@ describe('Guests', () => {
     vi.mocked(guestService.deleteGuest).mockRejectedValueOnce({ response: { status: 500 } });
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     fireEvent.click(screen.getByRole('button', { name: 'delete_guest_action' }));
@@ -287,13 +287,13 @@ describe('Guests', () => {
       .mockResolvedValueOnce(page([GUEST, JANE]) as never);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'add_guest' }));
     fireEvent.click(screen.getByText('trigger-saved'));
 
     await waitFor(() => {
       expect(guestService.searchGuestsPaged).toHaveBeenCalledTimes(2);
-      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      expect(screen.getByText('Smith Jane')).toBeInTheDocument();
     });
   });
 
@@ -303,7 +303,7 @@ describe('Guests', () => {
     vi.mocked(guestService.deleteGuest).mockRejectedValueOnce({ response: { status: 451 } });
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'delete' }));
     fireEvent.click(screen.getByRole('button', { name: 'delete_guest_action' }));
@@ -318,15 +318,15 @@ describe('Guests', () => {
       .mockResolvedValueOnce(page([GUEST]) as never)
       .mockResolvedValueOnce(page([JANE]) as never);
     render(<Guests />);
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
 
     const input = screen.getByRole('searchbox');
     fireEvent.change(input, { target: { value: 'Jane' } });
 
     await waitFor(() => {
       expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('Jane', 0, 20, 'lastName,asc');
-      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
-      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      expect(screen.queryByText('Doe John')).not.toBeInTheDocument();
+      expect(screen.getByText('Smith Jane')).toBeInTheDocument();
     }, { timeout: 500 });
   });
 
@@ -337,7 +337,7 @@ describe('Guests', () => {
 
     await waitFor(() => {
       expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('Jane', 0, 20, 'lastName,asc');
-      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      expect(screen.getByText('Smith Jane')).toBeInTheDocument();
     });
   });
 
@@ -365,7 +365,7 @@ describe('Guests', () => {
       .mockResolvedValueOnce(page([GUEST], 3) as never)
       .mockResolvedValueOnce(page([JANE], 3) as never);
     render(<Guests />);
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'next_page' }));
 
@@ -396,13 +396,13 @@ describe('Guests', () => {
     fireEvent.click(screen.getByRole('button', { name: 'guests_show_all' }));
 
     expect(screen.getByRole('searchbox')).toHaveValue('');
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
   });
 
   it('should show a dash, not "- (-)", for a guest with no city and no country', async () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([JANE]) as never);
     render(<Guests />);
-    await waitFor(() => expect(screen.getByText('Jane Smith')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Smith Jane')).toBeInTheDocument());
 
     expect(screen.queryByText('- (-)')).not.toBeInTheDocument();
   });
@@ -412,13 +412,13 @@ describe('Guests', () => {
       .mockResolvedValueOnce(page([GUEST], 2) as never)
       .mockResolvedValueOnce(page([JANE], 2) as never);
     render(<Guests />);
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'next_page' }));
 
     await waitFor(() => {
       expect(guestService.searchGuestsPaged).toHaveBeenCalledWith('', 1, 20, 'lastName,asc');
-      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      expect(screen.getByText('Smith Jane')).toBeInTheDocument();
     });
   });
 
@@ -427,7 +427,7 @@ describe('Guests', () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     expect(screen.queryByRole('menuitem', { name: 'export_guest_data' })).not.toBeInTheDocument();
   });
 
@@ -436,7 +436,7 @@ describe('Guests', () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'export_guest_data' }));
 
@@ -450,7 +450,7 @@ describe('Guests', () => {
     vi.mocked(guestService.downloadGuestDataExport).mockResolvedValueOnce(undefined);
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'export_guest_data' }));
     fireEvent.click(screen.getByRole('button', { name: 'export_guest_data_confirm_action' }));
@@ -467,7 +467,7 @@ describe('Guests', () => {
     vi.mocked(guestService.downloadGuestDataExport).mockRejectedValueOnce(new Error('network'));
     render(<Guests />);
 
-    await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
     openRowMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'export_guest_data' }));
     fireEvent.click(screen.getByRole('button', { name: 'export_guest_data_confirm_action' }));
@@ -491,17 +491,17 @@ describe('Guests', () => {
     it('shows the avatar initial and the email under the name', async () => {
       vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
       render(<Guests />);
-      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
 
       expect(screen.getByText('J')).toBeInTheDocument();
-      const nameCell = screen.getByText('John Doe').closest('div') as HTMLElement;
+      const nameCell = screen.getByText('Doe John').closest('div') as HTMLElement;
       expect(within(nameCell).getByText('john@test.com')).toBeInTheDocument();
     });
 
     it('keeps phone and city columns and drops the separate email column', async () => {
       vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
       render(<Guests />);
-      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
 
       expect(screen.getByRole('columnheader', { name: 'phone' })).toBeInTheDocument();
       expect(screen.getByRole('columnheader', { name: 'city' })).toBeInTheDocument();
@@ -511,14 +511,14 @@ describe('Guests', () => {
     it('shows the result range, also with a single page', async () => {
       vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST, JANE]) as never);
       render(<Guests />);
-      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
       expect(screen.getByText('list_range_summary')).toBeInTheDocument();
     });
 
     it('puts the search in the toolbar and still searches as you type', async () => {
       vi.mocked(guestService.searchGuestsPaged).mockResolvedValue(page([GUEST]) as never);
       render(<Guests />);
-      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText('Doe John')).toBeInTheDocument());
 
       fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'doe' } });
 
@@ -529,7 +529,7 @@ describe('Guests', () => {
   it('opens the detail sheet from the guest name', async () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
-    fireEvent.click(await screen.findByRole('button', { name: /John Doe/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Doe John/ }));
     expect(screen.getByRole('dialog', { name: 'detail_title' })).toBeInTheDocument();
     await waitFor(() => expect(stayService.getGuestStayHistory).toHaveBeenCalledWith('guest-1'));
   });
@@ -541,7 +541,7 @@ describe('Guests', () => {
     render(<Guests />);
     expect(await screen.findByRole('dialog', { name: 'detail_title' })).toBeInTheDocument();
     expect(guestService.getGuestById).toHaveBeenCalledWith('guest-1');
-    expect(within(screen.getByRole('dialog', { name: 'detail_title' })).getByText(/John Doe/)).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog', { name: 'detail_title' })).getByText(/Doe John/)).toBeInTheDocument();
   });
 
   it('shows an error toast when the linked guest cannot be loaded', async () => {
@@ -556,7 +556,7 @@ describe('Guests', () => {
   it('closes the detail sheet and opens the form when Edit is pressed in the sheet', async () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
-    fireEvent.click(await screen.findByRole('button', { name: /John Doe/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Doe John/ }));
     const sheet = screen.getByRole('dialog', { name: 'detail_title' });
     fireEvent.click(within(sheet).getByRole('button', { name: 'common:edit' }));
     expect(screen.queryByRole('dialog', { name: 'detail_title' })).not.toBeInTheDocument();
@@ -566,7 +566,7 @@ describe('Guests', () => {
   it('starts a reservation for the guest from the sheet', async () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
-    fireEvent.click(await screen.findByRole('button', { name: /John Doe/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Doe John/ }));
     const sheet = screen.getByRole('dialog', { name: 'detail_title' });
     fireEvent.click(within(sheet).getByRole('button', { name: 'common:new_reservation' }));
     expect(mockNavigate).toHaveBeenCalledWith('/reservations/new', { state: { guest: GUEST } });
@@ -575,7 +575,7 @@ describe('Guests', () => {
   it('closes the detail sheet with its close button', async () => {
     vi.mocked(guestService.searchGuestsPaged).mockResolvedValueOnce(page([GUEST]) as never);
     render(<Guests />);
-    fireEvent.click(await screen.findByRole('button', { name: /John Doe/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Doe John/ }));
     fireEvent.click(screen.getByRole('button', { name: 'close' }));
     expect(screen.queryByRole('dialog', { name: 'detail_title' })).not.toBeInTheDocument();
   });

@@ -1467,7 +1467,7 @@ class ReservationServiceImplTest {
 
         final String content = out.toString(StandardCharsets.UTF_8);
         assertTrue(content.contains("guestName;checkInDate;checkOutDate;status;expectedGuests;actualGuests"));
-        assertTrue(content.contains(FULL_NAME));
+        assertTrue(content.contains(GUEST_LAST_NAME + " " + GUEST_FIRST_NAME));
         assertTrue(content.contains(String.valueOf(STATUS_CONFIRMED)));
     }
 

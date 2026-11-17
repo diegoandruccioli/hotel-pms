@@ -1,5 +1,6 @@
 package com.hotelpms.frontdesk.groups.service.impl;
 
+import com.hotelpms.commonweb.text.PersonNames;
 import com.hotelpms.internalauth.security.TenantContext;
 
 import com.hotelpms.frontdesk.client.BillingClient;
@@ -110,7 +111,7 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
 
         log.info("[GROUP] CREATED | groupId={} | hotelId={} | rooms={}",
                 savedGroup.getId(), hotelId, members.size());
-        return toResponse(savedGroup, contactGuest.firstName() + " " + contactGuest.lastName(), members);
+        return toResponse(savedGroup, PersonNames.surnameFirst(contactGuest.firstName(), contactGuest.lastName()), members);
     }
 
     /** {@inheritDoc} */
@@ -214,7 +215,7 @@ public class ReservationGroupServiceImpl implements ReservationGroupService {
             guestIds.add(group.getContactGuestId());
         }
         final Map<UUID, String> guestNames = guestClient.getGuestsBatch(guestIds).stream()
-                .collect(Collectors.toMap(GuestResponse::id, g -> g.firstName() + " " + g.lastName()));
+                .collect(Collectors.toMap(GuestResponse::id, g -> PersonNames.surnameFirst(g.firstName(), g.lastName())));
 
         final List<GroupMemberResponse> members = memberReservations.stream()
                 .map(r -> new GroupMemberResponse(

@@ -915,7 +915,7 @@ class InvoiceServiceImplTest {
 
                 // Assert
                 assertEquals(1, result.getTotalElements());
-                assertEquals("Mario Rossi", result.getContent().get(0).guestName());
+                assertEquals("Rossi Mario", result.getContent().get(0).guestName());
                 verify(guestClient, never()).searchGuests(any(), anyInt());
         }
 
@@ -1042,7 +1042,7 @@ class InvoiceServiceImplTest {
                 final String content = out.toString(StandardCharsets.UTF_8);
                 assertTrue(content.contains("invoiceNumber;guestName;issueDate;status;documentType;totalAmount"));
                 assertTrue(content.contains(INV_123));
-                assertTrue(content.contains("Mario Rossi"));
+                assertTrue(content.contains("Rossi Mario"));
                 assertTrue(content.contains(String.valueOf(InvoiceStatus.ISSUED)));
         }
 

@@ -8,6 +8,7 @@ import { useDebounce } from '../hooks';
 import { useCommandPaletteGuests, useCommandPaletteReservations } from '../hooks/queries';
 import { getPaletteEntries, type NavEntry } from '../config/navigation';
 import type { GuestResponseDTO } from '../types';
+import { formatGuestName } from '../utils';
 import type { ReservationResponse } from '../types';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -155,8 +156,12 @@ const NavCommandItem = ({ item, onSelect, tCommon, tSettings }: {
 
 const GuestCommandItem = ({ guest, onSelect }: { guest: GuestResponseDTO; onSelect: (g: GuestResponseDTO) => void }) => {
   const handleSelect = useCallback(() => onSelect(guest), [onSelect, guest]);
-  const fullName = `${guest.firstName} ${guest.lastName}`;
-  const keywords = useMemo(() => [fullName, guest.email], [fullName, guest.email]);
+  const fullName = formatGuestName(guest);
+  // Also searchable in the natural order, whichever way the name is typed.
+  const keywords = useMemo(
+    () => [fullName, `${guest.firstName} ${guest.lastName}`, guest.email],
+    [fullName, guest.firstName, guest.lastName, guest.email],
+  );
   return (
     <Command.Item value={`guest-${guest.id}`} onSelect={handleSelect} className={ITEM_CLASS} keywords={keywords}>
       <MaterialIcon name="person" size={18} className="text-on-surface-variant" />

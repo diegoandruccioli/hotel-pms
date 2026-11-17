@@ -203,11 +203,11 @@ test.describe('Reservations', () => {
 
     // Step 3: find and choose the guest
     await page.getByPlaceholder(/cerca ospite|search guest/i).fill('Mario');
-    await page.getByRole('button', { name: /mario rossi/i }).click();
+    await page.getByRole('button', { name: /rossi mario/i }).click();
     await next.click();
 
     // Step 4: summary, then confirm
-    await expect(page.getByRole('region', { name: /^(summary|riepilogo)$/i })).toContainText('Mario Rossi');
+    await expect(page.getByRole('region', { name: /^(summary|riepilogo)$/i })).toContainText('Rossi Mario');
     const created = page.waitForRequest((req) => req.method() === 'POST' && req.url().includes('/api/v1/reservations'));
     await page.getByRole('button', { name: /confirm reservation|conferma prenotazione/i }).click();
     const body = JSON.parse((await created).postData() ?? '{}') as {

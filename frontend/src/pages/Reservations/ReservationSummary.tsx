@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { M3Card } from '../../components/m3';
 import { useFormatters } from '../../hooks/useFormatters';
 import type { GuestResponseDTO, RoomResponse } from '../../types';
-import { cn, nightsBetween } from '../../utils';
+import { cn, formatGuestName, nightsBetween } from '../../utils';
 
 interface ReservationSummaryProps {
   /** `panel` is the compact sticky column next to the steps; `full` is the summary step / view page. */
@@ -93,7 +93,7 @@ export const ReservationSummary = memo(({
         <SectionTitle>{t('summary_guest')}</SectionTitle>
         {guest ? (
           <>
-            <p className="text-sm text-on-surface">{guest.firstName} {guest.lastName}</p>
+            <p className="text-sm text-on-surface">{formatGuestName(guest)}</p>
             {variant === 'full' && (guest.email || guest.phone) && (
               <p className="text-sm text-on-surface-variant">
                 {[guest.email, guest.phone].filter(Boolean).join(' · ')}

@@ -5,7 +5,7 @@ import { M3Button } from './m3';
 import { M3TextField } from './m3';
 import { guestService } from '../services';
 import type { GuestResponseDTO, GuestRequestDTO } from '../types';
-import { getErrorMessage } from '../utils';
+import { formatGuestName, getErrorMessage } from '../utils';
 
 interface GuestSuggestionItemProps {
   guest: GuestResponseDTO;
@@ -25,7 +25,7 @@ const GuestSuggestionItem = memo(({ guest, onSelect }: GuestSuggestionItemProps)
         onClick={handleClick}
       >
         <div>
-          <p className="font-medium text-on-surface">{guest.firstName} {guest.lastName}</p>
+          <p className="font-medium text-on-surface">{formatGuestName(guest)}</p>
           <p className="text-sm text-on-surface-variant">{guest.email}</p>
         </div>
         <MaterialIcon name="chevron_right" className="text-on-surface-variant" />
@@ -132,7 +132,7 @@ export const GuestSearchAndCreate = memo(({
     return (
       <div className="p-4 border border-primary rounded-shape-md bg-primary/5 flex justify-between items-center">
         <div>
-          <p className="font-medium text-on-surface">{selectedGuest.firstName} {selectedGuest.lastName}</p>
+          <p className="font-medium text-on-surface">{formatGuestName(selectedGuest)}</p>
           <p className="text-sm text-on-surface-variant">
             {selectedGuest.email} {selectedGuest.phone ? `• ${selectedGuest.phone}` : ''}
           </p>
