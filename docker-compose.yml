@@ -708,7 +708,9 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
+          # 1.0 (not 0.5): the first PDF after a restart took ~6 s (up to 13 s with dashboard requests in parallel) while
+          # the JVM was throttled by the CFS quota; the startup warm-up (PdfRendererWarmUp) also runs faster with it.
+          cpus: "1.0"
           memory: 512M
         reservations:
           cpus: "0.10"

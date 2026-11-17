@@ -7,6 +7,11 @@ spring:
     config:
       enabled: false
 
+billing:
+  pdf:
+    warm-up:
+      enabled: false
+
 internal:
   hmac:
     secret: test-hmac-secret-minimum-32-characters-for-unit-tests

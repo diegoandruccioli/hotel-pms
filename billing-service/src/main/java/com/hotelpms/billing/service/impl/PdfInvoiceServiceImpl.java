@@ -45,8 +45,10 @@ import java.util.UUID;
 @Slf4j
 public class PdfInvoiceServiceImpl implements PdfInvoiceService {
 
-    private static final String TEMPLATE_FATTURA = "invoice-fattura";
-    private static final String TEMPLATE_RICEVUTA = "invoice-ricevuta";
+    /** Template name for a FATTURA (shared with the startup warm-up). */
+    public static final String TEMPLATE_FATTURA = "invoice-fattura";
+    /** Template name for a RICEVUTA (shared with the startup warm-up). */
+    public static final String TEMPLATE_RICEVUTA = "invoice-ricevuta";
 
     // Classpath location for the dev-provided hotel logo (never admin-uploaded —
     // see ADR in backup/DECISIONS.md: uploads are an attack surface, a static asset
