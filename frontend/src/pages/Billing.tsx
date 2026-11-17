@@ -186,7 +186,16 @@ export const Billing = memo(() => {
   return (
     <div className="space-y-6">
       {PILOT_MODE && (
-        <Alert tone="warning" className="font-medium">{t('pilot_mode_fiscal_banner')}</Alert>
+        <Alert tone="warning">
+          {/* Native disclosure: the full text stays one tap away, the closed banner stays one line tall. */}
+          <details>
+            <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-x-2 font-medium sm:pointer-fine:min-h-0">
+              {t('pilot_mode_fiscal_banner_title')}
+              <span className="font-normal underline">{t('pilot_mode_fiscal_banner_details')}</span>
+            </summary>
+            <p className="pb-1 pt-2">{t('pilot_mode_fiscal_banner')}</p>
+          </details>
+        </Alert>
       )}
       <PageHeader
         icon="receipt_long"
