@@ -39,7 +39,7 @@ describe('GuestSearchAndCreate', () => {
 
   it('renders selected guest card when guest is provided', () => {
     render(<GuestSearchAndCreate selectedGuest={GUEST} onSelectGuest={onSelectGuest} onClearGuest={onClearGuest} />);
-    expect(screen.getByText('John Doe')).toBeInTheDocument();
+    expect(screen.getByText('Doe John')).toBeInTheDocument();
     expect(screen.getByText('john@test.com', { exact: false })).toBeInTheDocument();
   });
 
@@ -75,7 +75,7 @@ describe('GuestSearchAndCreate', () => {
     fireEvent.change(screen.getByLabelText('search_guest_placeholder'), { target: { value: 'John' } });
 
     await waitFor(() => expect(guestService.searchGuests).toHaveBeenCalledWith('John'), { timeout: 1000 });
-    const suggestion = await screen.findByText('John Doe');
+    const suggestion = await screen.findByText('Doe John');
     fireEvent.click(suggestion);
 
     expect(onSelectGuest).toHaveBeenCalledWith(GUEST);

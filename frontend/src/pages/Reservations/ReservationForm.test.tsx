@@ -282,7 +282,7 @@ describe('ReservationForm', () => {
       await waitForTitle('reservation_details');
 
       expect(screen.getByRole('region', { name: 'summary_title' })).toBeInTheDocument();
-      expect(screen.getByText(/Mario Rossi/)).toBeInTheDocument();
+      expect(screen.getByText(/Rossi Mario/)).toBeInTheDocument();
       expect(screen.getByText('room_number')).toBeInTheDocument();
       expect(screen.queryByRole('list', { name: 'stepper_aria_label' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /confirm_reservation|update_reservation|btn_next/ })).not.toBeInTheDocument();
@@ -370,7 +370,7 @@ describe('ReservationForm', () => {
 
         answer(mockGuest({ id: 'g1', firstName: 'Anna', lastName: 'Bianchi-Verdi' }));
 
-        expect(await screen.findByText(/Anna Bianchi-Verdi/)).toBeInTheDocument();
+        expect(await screen.findByText(/Bianchi-Verdi Anna/)).toBeInTheDocument();
       });
 
       it('shows the already-checked-in banner when a slow stay lookup finally answers', async () => {
@@ -483,7 +483,7 @@ describe('ReservationForm', () => {
       renderEdit();
       await waitForTitle('edit_reservation');
 
-      expect(within(screen.getByRole('region', { name: 'summary_title' })).getByText(/Luigi Verdi/)).toBeInTheDocument();
+      expect(within(screen.getByRole('region', { name: 'summary_title' })).getByText(/Verdi Luigi/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /update_reservation/i })).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'reservation_step_summary' }));
@@ -577,7 +577,7 @@ describe('ReservationForm', () => {
     it('starts with the guest handed over by the guest sheet', async () => {
       renderNewWithState({ guest: mockGuest({ id: 'g9', firstName: 'Anna', lastName: 'Bianchi' }) });
       await waitForTitle('new_reservation');
-      expect(within(screen.getByRole('region', { name: 'summary_title' })).getByText('Anna Bianchi')).toBeInTheDocument();
+      expect(within(screen.getByRole('region', { name: 'summary_title' })).getByText('Bianchi Anna')).toBeInTheDocument();
     });
 
     it('ignores a malformed guest in the router state', async () => {

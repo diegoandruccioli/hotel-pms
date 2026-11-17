@@ -674,7 +674,7 @@ class QuotationServiceImplTest {
         final Page<QuotationResponse> result = quotationService.getAllQuotations(PageRequest.of(0, 10));
 
         assertEquals(1, result.getTotalElements());
-        assertEquals(GUEST_FIRST_NAME + " " + GUEST_LAST_NAME, result.getContent().get(0).guestFullName());
+        assertEquals(GUEST_LAST_NAME + " " + GUEST_FIRST_NAME, result.getContent().get(0).guestFullName());
     }
 
     @Test
@@ -700,7 +700,7 @@ class QuotationServiceImplTest {
         final Page<QuotationResponse> result = quotationService.getAllQuotations(PageRequest.of(0, 10));
 
         assertEquals(1, result.getTotalElements());
-        assertEquals(GUEST_FIRST_NAME + " " + GUEST_LAST_NAME, result.getContent().get(0).guestFullName());
+        assertEquals(GUEST_LAST_NAME + " " + GUEST_FIRST_NAME, result.getContent().get(0).guestFullName());
         verify(guestClient, never()).getGuestsBatch(any());
     }
 
@@ -803,7 +803,7 @@ class QuotationServiceImplTest {
         // validUntil == today is still valid; the day before is expired.
         assertEquals(QuotationStatus.DRAFT, result.getContent().get(0).status());
         assertEquals(QuotationStatus.EXPIRED, result.getContent().get(1).status());
-        assertEquals(GUEST_FIRST_NAME + " " + GUEST_LAST_NAME, result.getContent().get(0).guestFullName());
+        assertEquals(GUEST_LAST_NAME + " " + GUEST_FIRST_NAME, result.getContent().get(0).guestFullName());
     }
 
     @Test

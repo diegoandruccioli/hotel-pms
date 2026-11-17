@@ -18,7 +18,7 @@ import { useToastStore } from '../store';
 import { useGuestsSearch, useDeleteGuest } from '../hooks/queries';
 import { useDebounce, useListRangeSummary } from '../hooks';
 import { queryKeys } from '../lib';
-import { getErrorMessage } from '../utils';
+import { formatGuestName, getErrorMessage } from '../utils';
 import { guestService } from '../services';
 import { GuestFormModal } from '../components/GuestFormModal';
 import { GuestDetailSheet } from './Guests/GuestDetailSheet';
@@ -312,7 +312,7 @@ export const Guests = memo(() => {
 
       {guestToDelete && (
         <M3ConfirmDialog
-          title={t('delete_guest_title', { name: `${guestToDelete.firstName} ${guestToDelete.lastName}` })}
+          title={t('delete_guest_title', { name: formatGuestName(guestToDelete) })}
           titleId="confirm-delete-guest-dialog"
           message={t('delete_guest_confirm')}
           confirmLabel={t('delete_guest_action')}

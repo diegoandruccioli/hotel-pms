@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import type { GuestResponseDTO } from '../../types';
+import { formatGuestName } from '../../utils';
 import { M3Avatar, M3RowActionsMenu, M3TableActionLink, type RowAction } from '../../components/m3';
 
 interface ActionsCellProps {
@@ -29,7 +30,7 @@ export const GuestActionsCell = ({ guest, onEdit, onDelete, onExport, t }: Actio
         {t('edit')}
       </M3TableActionLink>
       <M3RowActionsMenu
-        label={t('row_actions_for', { name: `${guest.firstName} ${guest.lastName}` })}
+        label={t('row_actions_for', { name: formatGuestName(guest) })}
         items={items}
       />
     </div>
@@ -56,7 +57,7 @@ export const GuestNameCell = ({ guest, onOpen }: NameCellProps) => {
     >
       <M3Avatar name={guest.firstName || guest.lastName} size="md" aria-hidden="true" />
       <span className="min-w-0">
-        <span className="block font-medium">{guest.firstName} {guest.lastName}</span>
+        <span className="block font-medium">{formatGuestName(guest)}</span>
         {guest.email && <span className="block text-xs text-on-surface-variant">{guest.email}</span>}
       </span>
     </button>

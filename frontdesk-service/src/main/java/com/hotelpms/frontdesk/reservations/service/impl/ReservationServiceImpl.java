@@ -2,6 +2,7 @@ package com.hotelpms.frontdesk.reservations.service.impl;
 
 import com.hotelpms.internalauth.security.TenantContext;
 
+import com.hotelpms.commonweb.text.PersonNames;
 import com.hotelpms.commonweb.csv.CsvWriter;
 import com.hotelpms.commonweb.paging.StablePaging;
 import com.hotelpms.frontdesk.client.GuestClient;
@@ -171,7 +172,7 @@ public class ReservationServiceImpl implements ReservationService {
         final Map<UUID, String> guestNameMap = guestClient.getGuestsBatch(guestIds).stream()
                 .collect(Collectors.toMap(
                         (@NonNull GuestResponse gr) -> gr.id(),
-                        g -> g.firstName() + " " + g.lastName()
+                        g -> PersonNames.surnameFirst(g.firstName(), g.lastName())
                 ));
 
         return reservationPage.map(reservation -> {
@@ -203,7 +204,7 @@ public class ReservationServiceImpl implements ReservationService {
         final Map<UUID, String> guestNameMap = guestClient.getGuestsBatch(pageGuestIds).stream()
                 .collect(Collectors.toMap(
                         (@NonNull GuestResponse gr) -> gr.id(),
-                        g -> g.firstName() + " " + g.lastName()));
+                        g -> PersonNames.surnameFirst(g.firstName(), g.lastName())));
 
         return results.map(reservation -> enrichWithGuestName(
                 reservationMapper.toResponse(reservation),
@@ -271,7 +272,7 @@ public class ReservationServiceImpl implements ReservationService {
                         : guestClient.getGuestsBatch(guestIds).stream()
                                 .collect(Collectors.toMap(
                                         (@NonNull GuestResponse gr) -> gr.id(),
-                                        g -> g.firstName() + " " + g.lastName()));
+                                        g -> PersonNames.surnameFirst(g.firstName(), g.lastName())));
 
                 for (final Reservation reservation : page.getContent()) {
                     csv.printRow(List.of(
@@ -593,7 +594,7 @@ public class ReservationServiceImpl implements ReservationService {
         if (guest == null) {
             return enrichWithGuestName(response, UNKNOWN_GUEST);
         }
-        return enrichWithGuestName(response, guest.firstName() + " " + guest.lastName());
+        return enrichWithGuestName(response, PersonNames.surnameFirst(guest.firstName(), guest.lastName()));
     }
 
     private ReservationResponse enrichWithGuestName(final ReservationResponse response, final String fullName) {

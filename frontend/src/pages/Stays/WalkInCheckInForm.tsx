@@ -24,7 +24,7 @@ import {
   validateAlloggiatiGuests,
 } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
-import { getErrorMessage, todayIsoDate } from '../../utils';
+import { formatGuestName, getErrorMessage, todayIsoDate } from '../../utils';
 
 const GUEST_SEARCH_DEBOUNCE_MS = 300;
 
@@ -44,7 +44,7 @@ const GuestOption = memo(({ guest, selected, onSelect }: GuestOptionProps) => {
     <div role="option" aria-selected={selected}>
       <button type="button" onClick={handleClick}
         className="w-full text-left px-3 py-2 text-sm hover:bg-surface-variant focus:bg-surface-variant focus:outline-hidden focus:ring-2 focus:ring-primary focus:ring-inset">
-        {guest.firstName} {guest.lastName}
+        {formatGuestName(guest)}
         {guest.email ? ` · ${guest.email}` : ''}
       </button>
     </div>
@@ -244,7 +244,7 @@ export function WalkInCheckInForm() {
       checkOutDate: expectedCheckOutDate || undefined,
       extra: buildWalkInItems({
         roomLabel,
-        guestName: selectedGuest ? `${selectedGuest.firstName} ${selectedGuest.lastName}`.trim() : '',
+        guestName: selectedGuest ? formatGuestName(selectedGuest) : '',
         checkOutDate: expectedCheckOutDate,
       }),
     }),

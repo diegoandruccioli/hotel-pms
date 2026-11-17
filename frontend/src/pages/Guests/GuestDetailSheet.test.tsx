@@ -116,8 +116,8 @@ describe('GuestDetailSheet', () => {
 
   it('shows the name, contacts and fiscal data', async () => {
     renderSheet();
-    expect(screen.getByRole('dialog', { name: 'detail_title:Mario Rossi' })).toBeInTheDocument();
-    expect(screen.getByText('Mario Rossi')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'detail_title:Rossi Mario' })).toBeInTheDocument();
+    expect(screen.getByText('Rossi Mario')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'mario@test.com' })).toHaveAttribute('href', 'mailto:mario@test.com');
     expect(screen.getByRole('link', { name: '+39 333 1234567' })).toHaveAttribute('href', 'tel:+393331234567');
     expect(screen.getByText(/Via Roma 1/)).toBeInTheDocument();
@@ -129,8 +129,8 @@ describe('GuestDetailSheet', () => {
   it('names the sheet after the guest so a screen reader announces which record is open', () => {
     renderSheet({ ...GUEST, firstName: 'Anna', lastName: 'Bianchi' });
 
-    expect(screen.getByRole('dialog', { name: 'detail_title:Anna Bianchi' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'detail_title:Anna Bianchi' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'detail_title:Bianchi Anna' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'detail_title:Bianchi Anna' })).toBeInTheDocument();
   });
 
   it('omits contacts and fiscal rows the guest does not have', () => {
@@ -199,7 +199,7 @@ describe('GuestDetailSheet', () => {
     vi.mocked(stayService.getGuestStayHistory).mockRejectedValue(new Error('boom'));
     renderSheet();
     expect(await screen.findByText('err_history_load')).toBeInTheDocument();
-    expect(screen.getByText('Mario Rossi')).toBeInTheDocument();
+    expect(screen.getByText('Rossi Mario')).toBeInTheDocument();
     expect(await screen.findByText('INV-001')).toBeInTheDocument();
   });
 

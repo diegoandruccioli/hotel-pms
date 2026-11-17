@@ -167,13 +167,13 @@ test.describe('Walk-in Check-in', () => {
 
     await page.getByLabel(/^Room/).selectOption({ value: 'room-001' });
     await page.getByRole('searchbox').fill('Lucia');
-    await page.getByRole('option', { name: /Lucia Bianchi/i }).click();
+    await page.getByRole('option', { name: /Bianchi Lucia/i }).click();
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     await page.getByLabel(/Expected Check-out Date/).fill(tomorrow.toISOString().split('T')[0]);
 
     await expect(checklist.getByText('101 — Standard')).toBeVisible();
-    await expect(checklist.getByText('Lucia Bianchi').first()).toBeVisible();
+    await expect(checklist.getByText('Bianchi Lucia').first()).toBeVisible();
     await expect(checklist.getByText(/Check-out on/)).toBeVisible();
     await expect(checklist.getByText('4 of 6 items complete')).toBeVisible();
   });
@@ -215,8 +215,8 @@ test.describe('Walk-in Check-in', () => {
 
     // Search and select guest
     await page.getByRole('searchbox').fill('Lucia');
-    await expect(page.getByRole('option', { name: /Lucia Bianchi/i })).toBeVisible({ timeout: 3000 });
-    await page.getByRole('option', { name: /Lucia Bianchi/i }).click();
+    await expect(page.getByRole('option', { name: /Bianchi Lucia/i })).toBeVisible({ timeout: 3000 });
+    await page.getByRole('option', { name: /Bianchi Lucia/i }).click();
 
     // Set checkout date (tomorrow)
     const tomorrow = new Date();

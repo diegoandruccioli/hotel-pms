@@ -97,8 +97,8 @@ test.describe('Guests', () => {
 
   test('renders guest list with all guests', async ({ page }) => {
     await page.goto('/guests');
-    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByText('Anna Bianchi')).toBeVisible();
+    await expect(page.getByText('Rossi Mario')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Bianchi Anna')).toBeVisible();
     await expect(page.getByText('mario.rossi@test.com')).toBeVisible();
   });
 
@@ -133,7 +133,7 @@ test.describe('Guests', () => {
 
   test('opens edit modal for existing guest', async ({ page }) => {
     await page.goto('/guests');
-    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Rossi Mario')).toBeVisible({ timeout: 10000 });
     // Click first Edit button
     await page.getByRole('button', { name: /edit/i }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3000 });
@@ -143,7 +143,7 @@ test.describe('Guests', () => {
 
   test('shows delete confirmation for admin', async ({ page }) => {
     await page.goto('/guests');
-    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Rossi Mario')).toBeVisible({ timeout: 10000 });
     await page.getByRole('button', { name: /edit/i }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 3000 });
     // Delete button inside the dialog only — avoids strict mode with list row Delete buttons
@@ -152,14 +152,14 @@ test.describe('Guests', () => {
 
   test('client-side search filters guest list', async ({ page }) => {
     await page.goto('/guests');
-    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText('Rossi Mario')).toBeVisible({ timeout: 10000 });
 
     const searchInput = page.getByRole('searchbox');
     await searchInput.fill('mario');
 
     // After 300ms debounce + re-render, only Mario should be visible
-    await expect(page.getByText('Mario Rossi')).toBeVisible({ timeout: 2000 });
-    await expect(page.getByText('Anna Bianchi')).not.toBeVisible();
+    await expect(page.getByText('Rossi Mario')).toBeVisible({ timeout: 2000 });
+    await expect(page.getByText('Bianchi Anna')).not.toBeVisible();
   });
 
   test('links the history rows of the detail sheet to the reservation and the invoice', async ({ page }) => {
@@ -208,8 +208,8 @@ test.describe('Guests', () => {
     );
 
     await page.goto('/guests');
-    await expect(page.getByText('Anna Bianchi')).toBeVisible({ timeout: 10000 });
-    await page.getByRole('button', { name: 'Mario Rossi mario.rossi@test.com' }).click();
+    await expect(page.getByText('Bianchi Anna')).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Rossi Mario mario.rossi@test.com' }).click();
     const sheet = page.getByRole('dialog', { name: /guest detail|dettaglio ospite/i });
     await expect(sheet.getByText('INV-2026-0001')).toBeVisible({ timeout: 5000 });
 
@@ -253,8 +253,8 @@ test.describe('Guests', () => {
     );
 
     await page.goto('/guests');
-    await expect(page.getByText('Anna Bianchi')).toBeVisible({ timeout: 10000 });
-    await page.getByRole('button', { name: 'Mario Rossi mario.rossi@test.com' }).click();
+    await expect(page.getByText('Bianchi Anna')).toBeVisible({ timeout: 10000 });
+    await page.getByRole('button', { name: 'Rossi Mario mario.rossi@test.com' }).click();
 
     const sheet = page.getByRole('dialog', { name: /guest detail|dettaglio ospite/i });
     await expect(sheet).toBeVisible({ timeout: 5000 });
@@ -264,7 +264,7 @@ test.describe('Guests', () => {
 
     await page.keyboard.press('Escape');
     await expect(sheet).not.toBeVisible();
-    await expect(page.getByRole('button', { name: 'Mario Rossi mario.rossi@test.com' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Rossi Mario mario.rossi@test.com' })).toBeFocused();
   });
 
   test('returns focus to the guest name after editing from the sheet and closing the form', async ({ page }) => {
@@ -283,7 +283,7 @@ test.describe('Guests', () => {
     );
 
     await page.goto('/guests');
-    const nameButton = page.getByRole('button', { name: 'Mario Rossi mario.rossi@test.com' });
+    const nameButton = page.getByRole('button', { name: 'Rossi Mario mario.rossi@test.com' });
     await nameButton.click();
     await page.getByRole('dialog', { name: /guest detail|dettaglio ospite/i }).getByRole('button', { name: /^(edit|modifica)$/i }).click();
     await expect(page.getByRole('dialog')).toBeVisible();

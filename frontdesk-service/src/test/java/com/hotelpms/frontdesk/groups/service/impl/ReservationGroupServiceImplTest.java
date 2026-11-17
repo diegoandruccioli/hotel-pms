@@ -59,6 +59,7 @@ class ReservationGroupServiceImplTest {
     private static final int EXPECTED_GUESTS = 2;
     private static final String GROUP_NAME_ACME = "Acme Corp Offsite";
     private static final String MEMBER_FULL_NAME_JANE_DOE = "Jane Doe";
+    private static final String MEMBER_FULL_NAME_DOE_JANE = "Doe Jane";
     private static final int ROOM_PRICE = 200;
     private static final long STALE_VERSION = 99L;
 
@@ -239,9 +240,9 @@ class ReservationGroupServiceImplTest {
 
         final ReservationGroupResponse response = reservationGroupService.getGroup(groupId);
 
-        assertEquals("Mario Rossi", response.contactGuestName());
+        assertEquals("Rossi Mario", response.contactGuestName());
         assertEquals(1, response.members().size());
-        assertEquals(MEMBER_FULL_NAME_JANE_DOE, response.members().get(0).guestFullName());
+        assertEquals(MEMBER_FULL_NAME_DOE_JANE, response.members().get(0).guestFullName());
     }
 
     @Test

@@ -34,7 +34,7 @@ describe('ReservationSummary', () => {
     const region = screen.getByRole('region', { name: 'summary_title' });
     expect(region).toHaveTextContent('room_number');
     expect(region).toHaveTextContent('Double');
-    expect(region).toHaveTextContent('Mario Rossi');
+    expect(region).toHaveTextContent('Rossi Mario');
     expect(region).toHaveTextContent('summary_nights');
   });
 

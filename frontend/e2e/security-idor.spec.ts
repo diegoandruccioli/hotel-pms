@@ -181,8 +181,8 @@ test.describe('Security – IDOR Prevention', () => {
     await expect(page).toHaveURL(/\/guests/);
 
     // Both hotel-A guests must be visible
-    await expect(page.getByText('AliceHotelA Smith')).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText('BobHotelA Jones')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Smith AliceHotelA')).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Jones BobHotelA')).toBeVisible({ timeout: 5_000 });
 
     // Exactly 2 Edit buttons — no phantom rows from other hotels
     await expect(page.getByRole('button', { name: /edit/i })).toHaveCount(2);
