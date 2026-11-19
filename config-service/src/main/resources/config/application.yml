@@ -29,6 +29,13 @@ logging:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%replace(%X{correlationId:-}){'[\\r\\n]','_'}] %logger{36} - %replace(%msg){'[\\r\\n]','_'}%n"
 
 management:
+  observations:
+    enable:
+      # With sampling at 1.0 these two flooded Zipkin (~240 spans/min on an idle stack, its in-memory storage
+      # ran out of heap every ~4.4 h): Spring Security adds 4 spans to every request, Lettuce one per Redis
+      # command, including the Redis check of each 15 s healthcheck. Neither is used by a dashboard or alert.
+      spring.security: false
+      lettuce: false
   metrics:
     distribution:
       # Enable histogram buckets for HTTP requests so Prometheus can compute
