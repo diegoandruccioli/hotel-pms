@@ -215,6 +215,13 @@ services:
     profiles: ["observability"]
     ports:
       - "9411:9411"
+    environment:
+      # In-memory storage runs in the image's fixed 160 MB heap (-XX:+ExitOnOutOfMemoryError), whose old
+      # generation is ~107 MB. A span takes ~3 KB live (measured: 30000 spans = 88-93 MB after a full GC, 3-4 s
+      # pauses). The default cap of 500000 is never reached: zipkin hit OutOfMemoryError every ~4.4 h and
+      # restarted, losing all traces. With a cap well below the heap's capacity the oldest traces are evicted
+      # instead.
+      MEM_MAX_SPANS: "20000"
     healthcheck:
       test: ["CMD-SHELL", "wget -T5 -q -O /dev/null http://localhost:9411/health || exit 1"]
       interval: 15s
