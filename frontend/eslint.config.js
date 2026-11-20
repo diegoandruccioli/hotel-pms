@@ -8,6 +8,33 @@ import boundaries from "eslint-plugin-boundaries";
 import reactPerf from "eslint-plugin-react-perf";
 import { defineConfig, globalIgnores } from "eslint/config";
 
+// T-FE-01: statically ban XSS sinks — React JSX escaping is the only safe output path
+const xssSelectors = [
+  {
+    selector: 'JSXAttribute[name.name="dangerouslySetInnerHTML"]',
+    message: '[T-FE-01] dangerouslySetInnerHTML is forbidden — use React JSX expressions to prevent XSS.',
+  },
+  {
+    selector: 'AssignmentExpression[left.property.name="innerHTML"]',
+    message: '[T-FE-01] Direct innerHTML assignment is forbidden — use React JSX expressions to prevent XSS.',
+  },
+  {
+    selector: 'AssignmentExpression[left.property.name="outerHTML"]',
+    message: '[T-FE-01] Direct outerHTML assignment is forbidden — use React JSX expressions to prevent XSS.',
+  },
+];
+
+const i18nSelectors = [
+  {
+    selector: 'JSXAttribute[name.name=/^(aria-label|title|placeholder|alt)$/][value.type="Literal"][value.value=/[A-Za-zÀ-ú]/]',
+    message: '[i18n] aria-label/title/placeholder/alt text must come from t(), not a string literal.',
+  },
+  {
+    selector: 'JSXAttribute[name.name=/^(aria-label|title|placeholder|alt)$/] > JSXExpressionContainer > TemplateLiteral[quasis.0.value.raw=/[A-Za-zÀ-ú]/]',
+    message: '[i18n] aria-label/title/placeholder/alt text must come from t(), not a template literal with text.',
+  },
+];
+
 export default defineConfig([
   globalIgnores(["dist", "coverage"]),
   jsxA11y.flatConfigs.strict,
@@ -24,26 +51,21 @@ export default defineConfig([
     ],
     rules: {
       ...reactPerf.configs.recommended.rules,
-      // T-FE-01: statically ban XSS sinks — React JSX escaping is the only safe output path
-      'no-restricted-syntax': [
-        'error',
-        {
-          selector: 'JSXAttribute[name.name="dangerouslySetInnerHTML"]',
-          message: '[T-FE-01] dangerouslySetInnerHTML is forbidden — use React JSX expressions to prevent XSS.',
-        },
-        {
-          selector: 'AssignmentExpression[left.property.name="innerHTML"]',
-          message: '[T-FE-01] Direct innerHTML assignment is forbidden — use React JSX expressions to prevent XSS.',
-        },
-        {
-          selector: 'AssignmentExpression[left.property.name="outerHTML"]',
-          message: '[T-FE-01] Direct outerHTML assignment is forbidden — use React JSX expressions to prevent XSS.',
-        },
-      ],
+      'no-restricted-syntax': ['error', ...xssSelectors],
     },
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
+    },
+  },
+  {
+    // i18n: text read by users or screen readers must come from t(), never a literal in the code.
+    // Tests are left out (they assert on literal text); the XSS bans are repeated because a
+    // later block replaces the options of `no-restricted-syntax` instead of merging them.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/**/*.test.{ts,tsx}", "src/test-utils/**"],
+    rules: {
+      'no-restricted-syntax': ['error', ...xssSelectors, ...i18nSelectors],
     },
   },
   {

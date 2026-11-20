@@ -44,6 +44,11 @@ describe('GuestFormModal', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  it('takes the phone placeholder from the translations, not from a literal', () => {
+    render(<GuestFormModal onClose={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.getByLabelText('label_phone_number')).toHaveAttribute('placeholder', 'placeholder_phone_number');
+  });
+
   it('should have no accessibility violations in add mode', async () => {
     const { container } = render(
       <GuestFormModal onClose={vi.fn()} onSaved={vi.fn()} />

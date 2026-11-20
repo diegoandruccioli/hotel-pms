@@ -13,6 +13,7 @@
   "label_email_hint": "Email (se senza telefono)",
   "label_phone_hint": "Telefono (se senza email)",
   "label_phone_number": "Numero di telefono",
+  "placeholder_phone_number": "Es. 333 1234567",
   "err_email_or_phone": "È necessario inserire Email oppure Telefono",
   "err_create_guest_failed": "Creazione ospite non riuscita",
   "toast_guest_updated": "Ospite aggiornato con successo",

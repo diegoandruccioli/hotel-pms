@@ -12,7 +12,7 @@ import {
   useRoomsList,
 } from '../../hooks/queries';
 import { addDaysIso, getErrorMessage, todayIsoDate } from '../../utils';
-import { DEFAULT_VALID_DAYS, MAX_OPTIONS, defaultOptionLabel } from './quotationDraft';
+import { DEFAULT_VALID_DAYS, MAX_OPTIONS } from './quotationDraft';
 import type { OptionDraft } from './quotationDraft';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
@@ -41,7 +41,7 @@ export function useQuotationDraft() {
   const [checkInDate, setCheckInDate] = useState('');
   const [checkOutDate, setCheckOutDate] = useState('');
   const [expectedGuests, setExpectedGuests] = useState<number | string>(1);
-  const [options, setOptions] = useState<OptionDraft[]>([{ label: defaultOptionLabel(0), selectedRoomIds: [] }]);
+  const [options, setOptions] = useState<OptionDraft[]>([{ label: '', selectedRoomIds: [] }]);
   const [activeOptionIndex, setActiveOptionIndex] = useState(0);
   const [validUntil, setValidUntil] = useState(() => addDaysIso(todayIsoDate(), DEFAULT_VALID_DAYS));
 
@@ -125,7 +125,7 @@ export function useQuotationDraft() {
   const handleAddOption = useCallback(() => {
     setOptions((prev) => {
       if (prev.length >= MAX_OPTIONS) return prev;
-      const next = [...prev, { label: defaultOptionLabel(prev.length), selectedRoomIds: [] }];
+      const next = [...prev, { label: '', selectedRoomIds: [] }];
       setActiveOptionIndex(next.length - 1);
       return next;
     });

@@ -278,7 +278,7 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
                     className="flex-1"
                     value={phoneNumber}
                     onChange={handlePhoneNumberChange}
-                    placeholder="Es. 333 1234567"
+                    placeholder={t('placeholder_phone_number')}
                   />
                 </div>
               </div>

@@ -164,7 +164,7 @@ export const MainLayout = () => {
               type="button"
               className="flex items-center justify-center size-11 sm:pointer-fine:size-10 rounded-shape-full text-on-surface-variant hover:bg-surface-container-highest lg:hidden mr-2"
               onClick={openDrawer}
-              aria-label={t('nav_menu') ?? 'Open menu'}
+              aria-label={t('nav_menu')}
             >
               <MaterialIcon name="menu" size={24} />
             </button>
