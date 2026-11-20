@@ -9,6 +9,7 @@ import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
@@ -16,6 +17,7 @@ import java.net.ConnectException;
 import java.net.UnknownHostException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
@@ -45,6 +47,7 @@ public class GlobalErrorWebExceptionHandler implements ErrorWebExceptionHandler 
 
     private static final Logger LOG = LoggerFactory.getLogger(GlobalErrorWebExceptionHandler.class);
     private static final String ERRORS_BASE_URI = "https://hotel-pms.com/errors/";
+    private static final int MAX_CAUSE_DEPTH = 10;
 
     private final ObjectMapper objectMapper;
 
@@ -55,24 +58,34 @@ public class GlobalErrorWebExceptionHandler implements ErrorWebExceptionHandler 
     @Override
     public Mono<Void> handle(final ServerWebExchange exchange, final Throwable ex) {
         final HttpStatus status = resolveStatus(ex);
-        final String detail = status == HttpStatus.GATEWAY_TIMEOUT ? "GATEWAY_TIMEOUT" : "EXTERNAL_SERVICE_ERROR";
-        final String slug = status == HttpStatus.GATEWAY_TIMEOUT ? "gateway-timeout" : "external-service-error";
+        final boolean clientError = status.is4xxClientError();
 
         // Finding #17 pattern (security-report.md, LOW), same as
         // AbstractProblemDetailAdvice#handleFeignException: the exception
         // message here typically names the internal Docker service host
         // (e.g. "Failed to resolve 'fb-service'") — log it server-side only.
-        LOG.warn("Gateway routing failure for {} {}: {}",
-                exchange.getRequest().getMethod(), exchange.getRequest().getPath(), ex.toString());
+        if (clientError) {
+            // A wrong path or method is the caller's mistake, not an outage:
+            // no WARN noise for bots and scanners.
+            LOG.debug("Gateway client error {} for {} {}: {}", status.value(),
+                    exchange.getRequest().getMethod(), exchange.getRequest().getPath(), ex.toString());
+        } else {
+            LOG.warn("Gateway routing failure for {} {}: {}",
+                    exchange.getRequest().getMethod(), exchange.getRequest().getPath(), ex.toString());
+        }
 
         final Map<String, Object> body = new LinkedHashMap<>();
-        body.put("type", ERRORS_BASE_URI + slug);
-        body.put("title", status == HttpStatus.GATEWAY_TIMEOUT ? "Gateway Timeout" : "External Service Error");
+        body.put("type", ERRORS_BASE_URI + slug(status));
+        body.put("title", title(status));
         body.put("status", status.value());
-        body.put("detail", detail);
+        body.put("detail", detail(status));
         body.put("timestamp", Instant.now().toString());
 
         exchange.getResponse().setStatusCode(status);
+        if (clientError && ex instanceof ResponseStatusException statusEx) {
+            // e.g. Allow on a 405, Accept on a 415 (RFC 9110)
+            exchange.getResponse().getHeaders().putAll(statusEx.getHeaders());
+        }
         exchange.getResponse().getHeaders().setContentType(MediaType.APPLICATION_PROBLEM_JSON);
 
         final byte[] bytes;
@@ -87,19 +100,20 @@ public class GlobalErrorWebExceptionHandler implements ErrorWebExceptionHandler 
     }
 
     /**
-     * Walks the cause chain (WebClient/Reactor-Netty wrap the real network
-     * exception one or two levels deep) looking for a known connection or
-     * timeout failure, and maps it to 502 or 504 respectively. Anything
-     * unrecognized falls back to 502 rather than leaking a raw 500 — a
-     * gateway routing failure is, by definition, "some downstream problem",
-     * never a genuine application bug in the gateway itself.
+     * Picks the response status. The gateway's own client errors (unknown path 404,
+     * wrong method 405, malformed input 400, ...) keep their 4xx status: they are
+     * not downstream failures. The cause chain (WebClient/Reactor-Netty wrap the
+     * real network exception one or two levels deep) is searched for a timeout
+     * (504) or a connection failure (502). Spring Cloud Gateway reports its own
+     * route timeout as a 504 {@link ResponseStatusException}, honoured too. Anything
+     * else falls back to 502 rather than leaking a raw 500.
      *
      * @param ex the exception the WebFlux filter chain surfaced
      * @return the HTTP status to respond with
      */
     private static HttpStatus resolveStatus(final Throwable ex) {
         Throwable cause = ex;
-        for (int depth = 0; cause != null && depth < 10; depth++) {
+        for (int depth = 0; cause != null && depth < MAX_CAUSE_DEPTH; depth++) {
             if (cause instanceof TimeoutException) {
                 return HttpStatus.GATEWAY_TIMEOUT;
             }
@@ -108,6 +122,33 @@ public class GlobalErrorWebExceptionHandler implements ErrorWebExceptionHandler 
             }
             cause = cause.getCause();
         }
+        if (ex instanceof ResponseStatusException statusEx) {
+            final HttpStatus own = HttpStatus.resolve(statusEx.getStatusCode().value());
+            if (own != null && (own.is4xxClientError() || own == HttpStatus.GATEWAY_TIMEOUT)) {
+                return own;
+            }
+        }
         return HttpStatus.BAD_GATEWAY;
+    }
+
+    private static String detail(final HttpStatus status) {
+        return switch (status) {
+            case BAD_GATEWAY -> "EXTERNAL_SERVICE_ERROR";
+            default -> status.name();
+        };
+    }
+
+    private static String slug(final HttpStatus status) {
+        return switch (status) {
+            case BAD_GATEWAY -> "external-service-error";
+            default -> status.name().toLowerCase(Locale.ROOT).replace('_', '-');
+        };
+    }
+
+    private static String title(final HttpStatus status) {
+        return switch (status) {
+            case BAD_GATEWAY -> "External Service Error";
+            default -> status.getReasonPhrase();
+        };
     }
 }
