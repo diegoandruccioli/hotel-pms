@@ -13,6 +13,7 @@
   "label_email_hint": "Email (if no phone)",
   "label_phone_hint": "Phone (if no email)",
   "label_phone_number": "Phone number",
+  "placeholder_phone_number": "e.g. 333 1234567",
   "err_email_or_phone": "Email or phone is required",
   "err_create_guest_failed": "Failed to create guest",
   "toast_guest_updated": "Guest updated successfully",

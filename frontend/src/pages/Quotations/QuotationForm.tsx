@@ -15,7 +15,7 @@ import type { QuotationOptionRequest, QuotationRequest } from '../../types';
 import { RoomSelection } from '../../components/RoomSelection';
 import { getErrorMessage } from '../../utils';
 import { useToastStore } from '../../store';
-import { MAX_OPTIONS, defaultOptionLabel } from './quotationDraft';
+import { MAX_OPTIONS, optionDisplayName } from './quotationDraft';
 import { QuotationOptionTab } from './QuotationOptionTab';
 import { QuotationRecipientSection } from './QuotationRecipientSection';
 import { useQuotationDraft } from './useQuotationDraft';
@@ -78,7 +78,7 @@ export const QuotationForm = () => {
       setSubmitError(null);
 
       const optionRequests: QuotationOptionRequest[] = options.map((option, index) => ({
-        label: option.label.trim() || defaultOptionLabel(index),
+        label: optionDisplayName(option.label, index, t),
         roomIds: option.selectedRoomIds,
       }));
 
@@ -180,6 +180,7 @@ export const QuotationForm = () => {
         <M3TextField
           label={t('label_option_name')}
           value={activeOption.label}
+          supportingText={activeOption.label.trim() ? undefined : t('option_name_default_hint', { name: optionDisplayName('', activeOptionIndex, t) })}
           onChange={draft.handleActiveOptionLabelChange}
           className="max-w-xs"
         />

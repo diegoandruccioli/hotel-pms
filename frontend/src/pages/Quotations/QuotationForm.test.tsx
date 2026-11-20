@@ -260,7 +260,7 @@ describe('QuotationForm', () => {
       prospectEmail: 'mario@example.com',
       checkInDate: '2026-09-01',
       checkOutDate: '2026-09-03',
-      options: [{ label: 'Opzione 1', roomIds: ['r1'] }],
+      options: [{ label: 'quotations:option_default_name', roomIds: ['r1'] }],
     })));
     expect(mockNavigate).toHaveBeenCalledWith('/quotations');
   });
@@ -287,7 +287,7 @@ describe('QuotationForm', () => {
 
     await waitFor(() => expect(quotationService.createQuotation).toHaveBeenCalledWith(expect.objectContaining({
       options: [
-        { label: 'Opzione 1', roomIds: ['r1'] },
+        { label: 'quotations:option_default_name', roomIds: ['r1'] },
         { label: 'Suite deluxe', roomIds: ['r1'] },
       ],
     })));
@@ -301,7 +301,7 @@ describe('QuotationForm', () => {
     fireEvent.click(screen.getByText('action_add_option'));
     expect(screen.getByText('Selected:')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText(/Opzione 1/));
+    fireEvent.click(screen.getAllByText(/quotations:option_default_name/)[0]);
     expect(screen.getByText('Selected: r1')).toBeInTheDocument();
   });
 
@@ -354,10 +354,20 @@ describe('QuotationForm', () => {
     await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('action_add_option'));
-    const removeButtons = screen.getAllByLabelText(/^Rimuovi /);
-    expect(removeButtons.length).toBeGreaterThan(0);
+    const removeButtons = screen.getAllByLabelText('action_remove_option_named');
+    expect(removeButtons).toHaveLength(2);
     fireEvent.click(removeButtons[0]);
-    expect(screen.queryAllByLabelText(/^Rimuovi /).length).toBe(0);
+    expect(screen.queryAllByLabelText('action_remove_option_named')).toHaveLength(0);
+  });
+
+  it('starts a new option unnamed and explains the default name', async () => {
+    renderForm();
+    await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+
+    expect(screen.getByLabelText('label_option_name')).toHaveValue('');
+    expect(screen.getByText('option_name_default_hint')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('label_option_name'), { target: { value: 'Suite' } });
+    expect(screen.queryByText('option_name_default_hint')).not.toBeInTheDocument();
   });
 
   it('falls back to basePrice x nights when a selected room has no resolved price', async () => {
