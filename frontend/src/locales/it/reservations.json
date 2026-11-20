@@ -1,5 +1,4 @@
 {
-  "room_prefix": "Camera",
   "no_rooms_available": "Nessuna camera disponibile.",
   "price_total_stay": "€{{amount}} totale"
 }

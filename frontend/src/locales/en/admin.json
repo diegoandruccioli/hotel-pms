@@ -19,7 +19,6 @@
   "col_email": "Email",
   "col_role": "Role",
   "col_status": "Status",
-  "col_must_change_password": "PW Status",
   "col_actions": "Actions",
   "status_active": "Active",
   "status_inactive": "Inactive",

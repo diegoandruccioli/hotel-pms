@@ -20,7 +20,6 @@
   "action_decline": "Decline",
   "action_delete": "Delete",
   "action_download_pdf": "Download PDF",
-  "action_view": "Details",
   "empty_title": "No quotations yet",
   "empty_hint": "Create the first quotation: you can send it to the guest and convert it to a reservation at the guaranteed price.",
   "list_delete_title": "Delete this quotation?",

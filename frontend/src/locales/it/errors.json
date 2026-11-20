@@ -30,7 +30,6 @@
   "CANNOT_DEACTIVATE_SELF": "Non puoi disattivare il tuo stesso account.",
   "ACCESS_DENIED": "Non hai i permessi per eseguire questa azione.",
   "HOTEL_ID_NOT_AVAILABLE": "Impossibile determinare l'hotel associato alla sessione corrente.",
-  "MISSING_HOTEL_CONTEXT": "Impossibile determinare l'hotel associato alla sessione corrente.",
 
   "CHECKOUT_MUST_BE_AFTER_CHECKIN": "La data di check-out deve essere successiva a quella di check-in.",
   "ROOM_UNAVAILABLE": "La camera selezionata non è disponibile.",
@@ -70,13 +69,8 @@
   "NOTIFICATION_SERVICE_UNAVAILABLE": "Il servizio di invio email non è al momento raggiungibile.",
   "INVALID_JSON_PAYLOAD": "La richiesta inviata non è formattata correttamente.",
 
-  "HMAC_FAILED": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
   "HMAC_SIGNATURE_FAILED": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
   "FEIGN_HMAC_SIGNATURE_FAILED": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
-  "INVALID_INTERNAL_SIGNATURE": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
-  "MISSING_INTERNAL_HEADERS": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
-  "REPLAYED_INTERNAL_SIGNATURE": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
-  "STALE_INTERNAL_SIGNATURE": "Errore di autenticazione interna tra servizi. Riprova più tardi.",
   "INVALID_DATE_RANGE": "L'intervallo di date non è valido.",
   "DATE_RANGE_TOO_LARGE": "L'intervallo richiesto è troppo ampio — riduci il periodo.",
 

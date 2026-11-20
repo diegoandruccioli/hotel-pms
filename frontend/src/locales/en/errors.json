@@ -30,7 +30,6 @@
   "CANNOT_DEACTIVATE_SELF": "You cannot deactivate your own account.",
   "ACCESS_DENIED": "You do not have permission to perform this action.",
   "HOTEL_ID_NOT_AVAILABLE": "Could not determine the hotel for the current session.",
-  "MISSING_HOTEL_CONTEXT": "Could not determine the hotel for the current session.",
 
   "CHECKOUT_MUST_BE_AFTER_CHECKIN": "Check-out date must be after check-in date.",
   "ROOM_UNAVAILABLE": "The selected room is not available.",
@@ -70,13 +69,8 @@
   "NOTIFICATION_SERVICE_UNAVAILABLE": "The email delivery service is currently unavailable.",
   "INVALID_JSON_PAYLOAD": "The request could not be read — please check the data and try again.",
 
-  "HMAC_FAILED": "Internal service authentication error. Please try again later.",
   "HMAC_SIGNATURE_FAILED": "Internal service authentication error. Please try again later.",
   "FEIGN_HMAC_SIGNATURE_FAILED": "Internal service authentication error. Please try again later.",
-  "INVALID_INTERNAL_SIGNATURE": "Internal service authentication error. Please try again later.",
-  "MISSING_INTERNAL_HEADERS": "Internal service authentication error. Please try again later.",
-  "REPLAYED_INTERNAL_SIGNATURE": "Internal service authentication error. Please try again later.",
-  "STALE_INTERNAL_SIGNATURE": "Internal service authentication error. Please try again later.",
   "INVALID_DATE_RANGE": "The date range is not valid.",
   "DATE_RANGE_TOO_LARGE": "The requested range is too wide — narrow the period.",
 
