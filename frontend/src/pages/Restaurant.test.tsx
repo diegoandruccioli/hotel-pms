@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { ReactElement } from 'react';
 import { renderWithQuery } from '../test-utils';
 import { Restaurant } from './Restaurant';
@@ -96,6 +96,9 @@ const BILLED_ORDER: RestaurantOrderResponse = {
 const MENU_ITEM: MenuItemResponse = {
   id: 'mi1', name: 'Espresso', category: 'Generale', price: 2.5, available: true, description: null,
 };
+
+// A function result, not an array literal in the JSX scope (react-perf).
+const toEntries = (entry: string): string[] => [entry];
 
 describe('Restaurant', () => {
   beforeEach(() => {
@@ -312,6 +315,69 @@ describe('Restaurant', () => {
     const rows = screen.getAllByText(/Guest$/);
     expect(rows[0]).toHaveTextContent('Old Guest');
     expect(rows[1]).toHaveTextContent('New Guest');
+  });
+
+  describe('list state in the URL', () => {
+    const CANCELLED_ORDER: RestaurantOrderResponse = {
+      ...PENDING_ORDER, id: 'cancelled-1', roomNumber: '309', guestDisplayName: 'Verdi Luca', status: 'CANCELLED',
+    };
+
+    const LocationProbe = () => {
+      const loc = useLocation();
+      return <output data-testid="location">{`${loc.pathname}${loc.search}`}</output>;
+    };
+
+    const renderAt = async (entry: string) => {
+      vi.mocked(fbService.getAllOrders).mockResolvedValue([PENDING_ORDER, BILLED_ORDER, CANCELLED_ORDER]);
+      const entries = toEntries(entry);
+      renderWithQuery(
+        <MemoryRouter initialEntries={entries}>
+          <Restaurant />
+          <LocationProbe />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(screen.getAllByText(/^(Rossi Mario|Bianchi Anna|Verdi Luca)$/).length).toBeGreaterThan(0));
+    };
+
+    it('opens with the status filter from the URL', async () => {
+      await renderAt('/restaurant?status=CLOSED');
+      expect(screen.getByRole('button', { name: 'order_filter_closed' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('Bianchi Anna')).toBeInTheDocument();
+      expect(screen.queryByText('Rossi Mario')).not.toBeInTheDocument();
+    });
+
+    it('opens with the sort from the URL', async () => {
+      await renderAt('/restaurant?sort=roomNumber&dir=asc');
+      const rows = screen.getAllByText(/^(Rossi Mario|Bianchi Anna|Verdi Luca)$/).map((el) => el.textContent);
+      const byRoom = [PENDING_ORDER, BILLED_ORDER, CANCELLED_ORDER]
+        .sort((a, b) => (a.roomNumber ?? '').localeCompare(b.roomNumber ?? ''))
+        .map((o) => o.guestDisplayName);
+      expect(rows).toEqual(byRoom);
+    });
+
+    it('ignores an unknown status, sort or direction in silence', async () => {
+      await renderAt('/restaurant?status=PENDING&sort=totalAmount&dir=up');
+      expect(screen.getByRole('button', { name: 'order_filter_all' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('Verdi Luca')).toBeInTheDocument();
+    });
+
+    it('writes the chosen status to the URL and drops it again for "all"', async () => {
+      await renderAt('/restaurant');
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/restaurant$/);
+
+      fireEvent.click(screen.getByRole('button', { name: 'order_filter_closed' }));
+      expect(screen.getByTestId('location')).toHaveTextContent('/restaurant?status=CLOSED');
+
+      fireEvent.click(screen.getByRole('button', { name: 'order_filter_all' }));
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/restaurant$/);
+    });
+
+    it('writes the sort to the URL', async () => {
+      await renderAt('/restaurant');
+      const roomHeader = screen.getByRole('columnheader', { name: /room_label/i });
+      fireEvent.click(within(roomHeader).getByRole('button'));
+      expect(screen.getByTestId('location')).toHaveTextContent('/restaurant?sort=roomNumber&dir=asc');
+    });
   });
 
   describe('order filter chips', () => {

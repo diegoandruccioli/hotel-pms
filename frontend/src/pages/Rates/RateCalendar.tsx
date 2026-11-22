@@ -1,7 +1,8 @@
 import { useFormatters } from '../../hooks';
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, addMonths, subMonths, isSameDay } from 'date-fns';
+import { useSearchParams } from 'react-router-dom';
+import { format, eachDayOfInterval, endOfMonth, addMonths, subMonths, isSameDay } from 'date-fns';
 import { rateSeasonService } from '../../services';
 import type { RateCalendarResponse } from '../../types';
 import { M3LoadingState } from '../../components/m3';
@@ -13,6 +14,7 @@ import { M3Card } from '../../components/m3';
 import { CELL_STYLE, CELL_WIDTH, ROW_STYLE, SIDEBAR_STYLE, SIDEBAR_WIDTH } from '../../lib/planningGrid';
 import { RateCalendarCell } from './RateCalendarCell';
 import { RateBulkApplyDialog } from './RateBulkApplyDialog';
+import { rateCalendarMonthToSearch, readRateCalendarMonth } from './rateCalendarParams';
 import { useAuthStore } from '../../store';
 import { getErrorMessage, cn, resolveDesignToken, dateFnsLocale } from '../../utils';
 
@@ -53,7 +55,9 @@ export const RateCalendar = () => {
   const role = useAuthStore((s) => s.user?.role);
   const canApplyPrice = role === 'ADMIN' || role === 'OWNER';
 
-  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()));
+  // The shown month lives in the URL (?month=2026-11) so that refresh and shared links reopen it.
+  const [urlParams, setUrlParams] = useSearchParams();
+  const currentMonth = useMemo(() => readRateCalendarMonth(urlParams), [urlParams]);
   const [calendar, setCalendar] = useState<RateCalendarResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,8 +102,14 @@ export const RateCalendar = () => {
     return () => window.removeEventListener('pointerup', handlePointerUp);
   }, []);
 
-  const handlePrevMonth = useCallback(() => setCurrentMonth((d) => subMonths(d, 1)), []);
-  const handleNextMonth = useCallback(() => setCurrentMonth((d) => addMonths(d, 1)), []);
+  const handlePrevMonth = useCallback(
+    () => setUrlParams(rateCalendarMonthToSearch(subMonths(currentMonth, 1)), { replace: true }),
+    [setUrlParams, currentMonth],
+  );
+  const handleNextMonth = useCallback(
+    () => setUrlParams(rateCalendarMonthToSearch(addMonths(currentMonth, 1)), { replace: true }),
+    [setUrlParams, currentMonth],
+  );
 
   const handlePointerDown = useCallback((rowIndex: number, dayIndex: number) => {
     setIsDragging(true);

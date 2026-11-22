@@ -9,7 +9,8 @@ import { rateSeasonService } from '../../services';
 // call would re-trigger the fetch on every render, racing the mocked service.
 const mockT = (key: string, opts?: Record<string, unknown>) =>
   (opts?.count !== undefined ? `${key}:${opts.count}` : key);
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
+import { endOfMonth, format, startOfMonth } from 'date-fns';
 import type { ReactElement } from 'react';
 
 // PageHeader derives its breadcrumbs from the router location.
@@ -61,6 +62,9 @@ const CALENDAR = {
   ],
 };
 
+// A function result, not an array literal in the JSX scope (react-perf).
+const toEntries = (entry: string): string[] => [entry];
+
 describe('RateCalendar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -72,6 +76,50 @@ describe('RateCalendar', () => {
     render(<RateCalendar />);
     await waitFor(() => expect(screen.getByText('Double')).toBeInTheDocument());
     expect(screen.getByText('€90.00')).toBeInTheDocument();
+  });
+
+  describe('shown month in the URL', () => {
+    const LocationProbe = () => {
+      const loc = useLocation();
+      return <output data-testid="location">{`${loc.pathname}${loc.search}`}</output>;
+    };
+
+    const renderAt = (entry: string) => {
+      vi.mocked(rateSeasonService.getRateCalendar).mockResolvedValue(CALENDAR);
+      const entries = toEntries(entry);
+      rtlRender(
+        <MemoryRouter initialEntries={entries}>
+          <RateCalendar />
+          <LocationProbe />
+        </MemoryRouter>,
+      );
+    };
+
+    it('opens on the month from the URL', async () => {
+      renderAt('/rates?month=2027-02');
+      await waitFor(() => expect(rateSeasonService.getRateCalendar).toHaveBeenCalledWith('2027-02-01', '2027-02-28'));
+    });
+
+    it('opens on the current month for a malformed month, without any message', async () => {
+      renderAt('/rates?month=2026-99');
+      const current = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+      await waitFor(() => expect(rateSeasonService.getRateCalendar)
+        .toHaveBeenCalledWith(current, format(endOfMonth(new Date()), 'yyyy-MM-dd')));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('writes the month to the URL when moving to the next and the previous month', async () => {
+      renderAt('/rates?month=2027-02');
+      await waitFor(() => expect(screen.getByText('Double')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByLabelText('next_month'));
+      expect(screen.getByTestId('location')).toHaveTextContent('/rates?month=2027-03');
+      await waitFor(() => expect(rateSeasonService.getRateCalendar).toHaveBeenCalledWith('2027-03-01', '2027-03-31'));
+
+      fireEvent.click(screen.getByLabelText('prev_month'));
+      fireEvent.click(screen.getByLabelText('prev_month'));
+      expect(screen.getByTestId('location')).toHaveTextContent('/rates?month=2027-01');
+    });
   });
 
   it('shows the apply-price button for ADMIN', async () => {
