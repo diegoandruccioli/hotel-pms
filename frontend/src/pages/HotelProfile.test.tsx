@@ -190,10 +190,29 @@ describe('HotelProfile', () => {
     expect(screen.queryByAltText('hotel_logo_preview_alt')).not.toBeInTheDocument();
   });
 
-  it('shows an error toast when loading settings fails', async () => {
-    vi.mocked(stayService.getHotelSettings).mockRejectedValue(new Error('boom'));
-    renderComponent();
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_profile_save', 'error'));
+  describe('when loading the profile fails', () => {
+    it('shows a load error, not the save message, and offers no form or save button', async () => {
+      vi.mocked(stayService.getHotelSettings).mockRejectedValue(new Error('boom'));
+      renderComponent();
+
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent('hotel_profile_load_title');
+      expect(alert).toHaveTextContent('hotel_profile_load_failed');
+      expect(mockAddToast).not.toHaveBeenCalled();
+      expect(screen.queryByRole('button', { name: /btn_save_profile/i })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/label_hotel_name/i)).not.toBeInTheDocument();
+    });
+
+    it('retries the load and then shows the filled form', async () => {
+      vi.mocked(stayService.getHotelSettings).mockRejectedValueOnce(new Error('boom'));
+      renderComponent();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'common:try_again' }));
+
+      expect(await screen.findByLabelText(/label_hotel_name/i)).toHaveValue('Hotel Test');
+      expect(stayService.getHotelSettings).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
   });
 
   it('shows an error toast when saving settings fails', async () => {

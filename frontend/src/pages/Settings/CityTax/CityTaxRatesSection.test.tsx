@@ -54,6 +54,24 @@ describe('CityTaxRatesSection', () => {
     await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
   });
 
+  it('shows a load error with a retry, not a false empty list, when loading fails', async () => {
+    vi.mocked(stayService.getCityTaxRates).mockReset();
+    vi.mocked(stayService.getCityTaxRates).mockRejectedValueOnce(new Error('boom'));
+    vi.mocked(stayService.getCityTaxRates).mockResolvedValueOnce([RATE]);
+    render(<CityTaxRatesSection />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('city_tax_rates_load_title');
+    expect(screen.queryByText('city_tax_no_rates')).not.toBeInTheDocument();
+    expect(mockAddToast).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'common:try_again' }));
+
+    await waitFor(() => expect(screen.getByText('€2.50')).toBeInTheDocument());
+    expect(stayService.getCityTaxRates).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('shows a rate row after data loads', async () => {
     vi.mocked(stayService.getCityTaxRates).mockResolvedValue([RATE]);
     render(<CityTaxRatesSection />);

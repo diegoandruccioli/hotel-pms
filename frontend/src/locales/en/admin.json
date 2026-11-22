@@ -46,6 +46,8 @@
   "btn_save_profile": "Save Profile",
   "toast_profile_saved": "Hotel profile saved",
   "err_profile_save": "Failed to save hotel profile",
+  "hotel_profile_load_title": "We couldn't load the hotel profile",
+  "hotel_profile_load_failed": "Check the connection and try again.",
   "section_title_housekeeping": "Cleaning Worksheet",
   "hint_housekeeping": "Determine which date the downloadable cleaning worksheet defaults to on Housekeeping — see the user manual §3.9b.",
   "label_timezone": "Timezone",

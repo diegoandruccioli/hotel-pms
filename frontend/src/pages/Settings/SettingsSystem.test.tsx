@@ -13,8 +13,11 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
+// `t` must keep one identity across renders: the settings load effect depends on it.
+const stableT = (key: string) => key;
+const stableI18n = { language: 'en' };
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
+  useTranslation: () => ({ t: stableT, i18n: stableI18n }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }));
 
@@ -58,15 +61,66 @@ describe('SettingsSystem', () => {
   it('tells the user when the settings fail to load instead of showing dead switches', async () => {
     vi.mocked(stayService.getHotelSettings).mockRejectedValue(new Error('boom'));
     renderPage();
-    expect(await screen.findByRole('alert')).toHaveTextContent('settings_system_load_failed');
-    screen.getAllByRole('switch').forEach((sw) => expect(sw).toBeDisabled());
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('settings_system_load_title');
+    expect(alert).toHaveTextContent('settings_system_load_failed');
+    expect(screen.queryAllByRole('switch')).toHaveLength(0);
+    expect(screen.queryByLabelText('email_greeting_label')).not.toBeInTheDocument();
+    expect(mockAddToast).not.toHaveBeenCalled();
   });
 
-  it('does not let the greeting be edited while the settings are not loaded', async () => {
-    vi.mocked(stayService.getHotelSettings).mockRejectedValue(new Error('boom'));
+  it('offers a retry that loads the settings again and shows the switches', async () => {
+    vi.mocked(stayService.getHotelSettings).mockRejectedValueOnce(new Error('boom'));
+    vi.mocked(stayService.getHotelSettings).mockResolvedValueOnce(SETTINGS);
     renderPage();
-    await screen.findByRole('alert');
-    expect(screen.getByLabelText('email_greeting_label')).toBeDisabled();
+    fireEvent.click(await screen.findByRole('button', { name: 'common:try_again' }));
+
+    const toggle = await screen.findByRole('switch', { name: ALLOGGIATI_SWITCH });
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+    expect(stayService.getHotelSettings).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('confirms every saved change with a success toast', async () => {
+    vi.mocked(stayService.getHotelSettings).mockResolvedValue(
+      { ...SETTINGS, sendReservationConfirmedEmail: true, emailGreetingText: 'Hi' });
+    vi.mocked(stayService.updateHotelSettings).mockResolvedValue(
+      { ...SETTINGS, sendReservationConfirmedEmail: true, emailGreetingText: 'Hi' });
+    renderPage();
+    const toggle = await screen.findByRole('switch', { name: ALLOGGIATI_SWITCH });
+    await waitFor(() => expect(toggle).not.toBeDisabled());
+
+    fireEvent.click(toggle);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('settings_system_saved', 'success'));
+
+    mockAddToast.mockClear();
+    const textarea = screen.getByLabelText('email_greeting_label');
+    fireEvent.change(textarea, { target: { value: 'Bye' } });
+    fireEvent.blur(textarea);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('settings_system_saved', 'success'));
+
+    mockAddToast.mockClear();
+    const subject = await screen.findByLabelText('email_subject_label');
+    fireEvent.change(subject, { target: { value: 'Subject' } });
+    fireEvent.blur(subject);
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('settings_system_saved', 'success'));
+  });
+
+  it('does not send the same change twice while it is still being saved', async () => {
+    vi.mocked(stayService.getHotelSettings).mockResolvedValue({ ...SETTINGS, emailGreetingText: 'Hi' });
+    let finish: (v: HotelSettingsResponse) => void = () => {};
+    vi.mocked(stayService.updateHotelSettings).mockReturnValue(
+      new Promise<HotelSettingsResponse>((resolve) => { finish = resolve; }));
+    renderPage();
+    const textarea = await screen.findByLabelText('email_greeting_label');
+
+    fireEvent.change(textarea, { target: { value: 'Bye' } });
+    fireEvent.blur(textarea);
+    fireEvent.blur(textarea);
+
+    expect(stayService.updateHotelSettings).toHaveBeenCalledTimes(1);
+    finish({ ...SETTINGS, emailGreetingText: 'Bye' });
+    await waitFor(() => expect(mockAddToast).toHaveBeenCalledTimes(1));
   });
 
   it('labels the greeting field and keeps its description and character count', async () => {

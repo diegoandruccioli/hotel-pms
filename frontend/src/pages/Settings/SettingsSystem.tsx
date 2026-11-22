@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, memo, type ChangeEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, memo, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { stayService } from '../../services';
 import type { HotelSettingsResponse, HotelSettingsRequest } from '../../types';
-import { Alert } from '../../components/Alert';
 import { M3Card } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
 import { M3Switch } from '../../components/m3';
 import { M3Textarea } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
@@ -63,24 +63,37 @@ export const SettingsSystem = () => {
   const [hotelSettings, setHotelSettings] = useState<HotelSettingsResponse | null>(null);
   const [saving, setSaving] = useState(false);
   const [greetingDraft, setGreetingDraft] = useState('');
-  const [loadFailed, setLoadFailed] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Changes being saved right now: the text fields are not disabled while saving, so a
+  // repeated blur would otherwise send the very same change twice.
+  const inFlight = useRef(new Set<string>());
 
-  useEffect(() => {
+  const loadSettings = useCallback(() => {
+    setLoadError(null);
     stayService.getHotelSettings().then((settings) => {
       setHotelSettings(settings);
       setGreetingDraft(settings.emailGreetingText ?? '');
-    }).catch(() => setLoadFailed(true));
-  }, []);
+    }).catch((err: unknown) => setLoadError(getErrorMessage(err, t('settings_system_load_failed'))));
+  }, [t]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const patch = useCallback(async (partial: HotelSettingsRequest) => {
+    const key = JSON.stringify(partial);
+    if (inFlight.current.has(key)) return;
+    inFlight.current.add(key);
     setSaving(true);
     try {
       const updated = await stayService.updateHotelSettings(partial);
       setHotelSettings(updated);
+      addToast(t('settings_system_saved'), 'success');
     } catch (err) {
       addToast(getErrorMessage(err, t('settings_system_save_failed')), 'error');
     } finally {
-      setSaving(false);
+      inFlight.current.delete(key);
+      setSaving(inFlight.current.size > 0);
     }
   }, [addToast, t]);
 
@@ -122,8 +135,15 @@ export const SettingsSystem = () => {
     <div className="space-y-6">
       <SettingsSectionTitle title={t('settings_section_system')} />
 
-      {loadFailed && <Alert tone="error">{t('settings_system_load_failed')}</Alert>}
-
+      {loadError !== null ? (
+        <M3ErrorState
+          title={t('settings_system_load_title')}
+          message={loadError}
+          retryLabel={t('common:try_again')}
+          onRetry={loadSettings}
+        />
+      ) : (
+      <>
       <M3Card variant="solid" className="p-6">
         <M3Switch
           icon="verified_user"
@@ -194,6 +214,8 @@ export const SettingsSystem = () => {
           </p>
         </div>
       </M3Card>
+      </>
+      )}
     </div>
   );
 };

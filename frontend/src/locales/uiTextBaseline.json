@@ -88,11 +88,7 @@
     "en:settings:city_tax_backfill_err_confirm",
     "en:settings:city_tax_backfill_err_preview",
     "en:settings:city_tax_backfill_skip_charge_failed",
-    "en:settings:city_tax_err_loading_applicability",
-    "en:settings:city_tax_err_loading_category",
-    "en:settings:city_tax_err_loading_rates",
     "en:settings:city_tax_err_save",
-    "en:settings:privacy_err_loading",
     "en:settings:privacy_err_save",
     "en:stays:err_checkin_failed",
     "en:stays:err_load_guests",
@@ -145,11 +141,7 @@
     "it:quotations:error_loading_pdf_preview",
     "it:quotations:error_loading_quotation",
     "it:rooms:toast_delete_error",
-    "it:settings:city_tax_err_loading_applicability",
-    "it:settings:city_tax_err_loading_category",
-    "it:settings:city_tax_err_loading_rates",
     "it:settings:city_tax_err_save",
-    "it:settings:privacy_err_loading",
     "it:settings:privacy_err_save"
   ],
   "allowed": {}
