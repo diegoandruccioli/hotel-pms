@@ -27,6 +27,16 @@ describe('M3FilterChip', () => {
     expect(chip.className).toContain('sm:pointer-fine:min-h-0');
   });
 
+  it('is at least 44 px wide on small screens and reaches 40 px with a mouse through an invisible hit area', () => {
+    render(<M3FilterChip label="All" selected={false} onClick={vi.fn()} />);
+    const chip = screen.getByRole('button', { name: 'All' });
+    expect(chip.className).toContain('min-w-11');
+    expect(chip.className).toContain('justify-center');
+    expect(chip.className).toContain('sm:pointer-fine:relative');
+    expect(chip.className).toContain('sm:pointer-fine:after:absolute');
+    expect(chip.className).toContain('sm:pointer-fine:after:-inset-y-1.5');
+  });
+
   it('calls onClick when pressed', () => {
     const onClick = vi.fn();
     render(<M3FilterChip label="Paid" selected={false} onClick={onClick} />);

@@ -29,7 +29,7 @@ export const M3ErrorState = ({ title, message, retryLabel, onRetry, className = 
         <button
           type="button"
           onClick={onRetry}
-          className="mt-2 text-sm font-medium underline hover:no-underline"
+          className="mt-1 inline-flex items-center min-h-11 sm:pointer-fine:min-h-10 text-sm font-medium underline hover:no-underline"
         >
           {retryLabel}
         </button>

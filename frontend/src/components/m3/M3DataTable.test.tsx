@@ -97,6 +97,18 @@ describe('M3DataTable', () => {
     expect(screen.getByRole('columnheader', { name: 'Value' })).not.toHaveAttribute('aria-sort');
   });
 
+  it('keeps the sort button a 44 px target on small screens and 40 px with a mouse, without growing the header row', () => {
+    render(
+      <M3DataTable data={ROWS} columns={COLUMNS} sorting={[]} onSortingChange={vi.fn()} emptyMessage="No rows" />,
+    );
+    const sort = screen.getByRole('button', { name: /Name/ });
+    expect(sort.className).toContain('min-h-11');
+    expect(sort.className).toContain('min-w-11');
+    expect(sort.className).toContain('sm:pointer-fine:relative');
+    expect(sort.className).toContain('sm:pointer-fine:after:absolute');
+    expect(sort.className).toContain('sm:pointer-fine:after:-inset-y-3');
+  });
+
   it('selects a column ascending on first click, then toggles asc/desc on repeated clicks', () => {
     const onSortingChange = vi.fn();
     const { rerender } = render(

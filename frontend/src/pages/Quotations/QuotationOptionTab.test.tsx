@@ -27,6 +27,19 @@ describe('QuotationOptionTab', () => {
     await i18n.changeLanguage('en');
   });
 
+  it('keeps both the tab and the remove button at least 44 px tall (40 px with a mouse)', async () => {
+    await i18n.changeLanguage('en');
+    renderTab(UNNAMED);
+
+    const tab = screen.getByRole('button', { name: /^Option 2/ });
+    expect(tab.className).toContain('min-h-11');
+    expect(tab.className).toContain('sm:pointer-fine:min-h-10');
+    const remove = screen.getByRole('button', { name: 'Remove Option 2' });
+    expect(remove.className).toContain('min-h-11');
+    expect(remove.className).toContain('min-w-11');
+    expect(remove.className).toContain('sm:pointer-fine:min-h-10');
+  });
+
   it('names the default option and its remove button in English', async () => {
     await i18n.changeLanguage('en');
     const { onRemove } = renderTab(UNNAMED);

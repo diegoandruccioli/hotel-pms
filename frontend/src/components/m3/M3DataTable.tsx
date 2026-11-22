@@ -177,7 +177,7 @@ const SortableHeaderCell = memo(({ columnId, label, canSort, direction, onToggle
         <button
           type="button"
           onClick={handleClick}
-          className="inline-flex items-center gap-1 min-h-11 -my-3.5 sm:pointer-fine:min-h-0 sm:pointer-fine:my-0 hover:text-on-surface focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
+          className="inline-flex items-center gap-1 min-h-11 min-w-11 -my-3.5 sm:pointer-fine:min-h-0 sm:pointer-fine:min-w-0 sm:pointer-fine:my-0 sm:pointer-fine:relative sm:pointer-fine:after:absolute sm:pointer-fine:after:inset-x-0 sm:pointer-fine:after:-inset-y-3 hover:text-on-surface focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-sm"
         >
           {label}
           <MaterialIcon

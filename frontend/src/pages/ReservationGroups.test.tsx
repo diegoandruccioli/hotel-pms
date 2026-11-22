@@ -89,6 +89,17 @@ describe('ReservationGroups', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/reservations/groups/new');
   });
 
+  it('gives the group name link a 44 px hit area (40 px with a mouse) without making the row taller', async () => {
+    vi.mocked(reservationGroupService.getAllGroups).mockResolvedValueOnce(page([GROUP]) as never);
+    render(<MemoryRouter><ReservationGroups /></MemoryRouter>);
+
+    const link = await screen.findByRole('button', { name: 'Acme Corp Offsite' });
+    expect(link.className).toContain('relative');
+    expect(link.className).toContain('after:absolute');
+    expect(link.className).toContain('after:-inset-y-3');
+    expect(link.className).not.toContain('min-h-11');
+  });
+
   it('should navigate to the group detail page when a group name is clicked', async () => {
     vi.mocked(reservationGroupService.getAllGroups).mockResolvedValueOnce(page([GROUP]) as never);
     render(<MemoryRouter><ReservationGroups /></MemoryRouter>);

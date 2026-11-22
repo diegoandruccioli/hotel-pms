@@ -27,7 +27,7 @@ export const QuotationOptionTab = memo(({ option, index, isActive, canRemove, to
         onClick={handleSelect}
         aria-pressed={isActive}
         className={cn(
-          'px-4 py-2 text-sm font-medium font-body rounded-shape-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary',
+          'min-h-11 sm:pointer-fine:min-h-10 px-4 py-2 text-sm font-medium font-body rounded-shape-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary',
           isActive ? 'text-on-primary-container' : 'text-on-surface-variant'
         )}
       >
@@ -38,7 +38,7 @@ export const QuotationOptionTab = memo(({ option, index, isActive, canRemove, to
           type="button"
           onClick={handleRemove}
           aria-label={t('action_remove_option_named', { name })}
-          className="pr-3 pl-1 text-on-surface-variant hover:text-error focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-full"
+          className="inline-flex items-center justify-center min-h-11 min-w-11 sm:pointer-fine:min-h-10 sm:pointer-fine:min-w-10 text-on-surface-variant hover:text-error focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary rounded-shape-full"
         >
           <MaterialIcon name="close" size={16} />
         </button>
