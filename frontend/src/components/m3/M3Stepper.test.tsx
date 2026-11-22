@@ -53,6 +53,14 @@ describe('M3Stepper', () => {
     expect(items[3].textContent).toContain('4');
   });
 
+  it('keeps a selectable step 44 px wide even when its label is hidden on small screens', () => {
+    renderStepper(2, upToTwo);
+    const step = screen.getByRole('button', { name: /Rooms/ });
+    expect(step.className).toContain('min-h-11');
+    expect(step.className).toContain('min-w-11');
+    expect(step.className).toContain('justify-center');
+  });
+
   it('renders selectable steps as buttons and calls onSelect with the index', () => {
     const onSelect = renderStepper(2, upToTwo);
     fireEvent.click(screen.getByRole('button', { name: /Rooms/ }));

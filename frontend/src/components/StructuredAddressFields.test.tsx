@@ -58,6 +58,24 @@ describe('StructuredAddressFields', () => {
     vi.mocked(stayService.searchLookupComuni).mockResolvedValue([ROMA]);
   });
 
+  it('makes the Comune field a 44 px target (40 px with a mouse)', () => {
+    render(
+      <StructuredAddressFields
+        idPrefix="test"
+        cap=""
+        comune=""
+        provincia=""
+        onCapChange={noop}
+        onComuneChange={noop}
+        onProvinciaChange={noop}
+      />,
+    );
+
+    const field = screen.getByLabelText('label_comune');
+    expect(field.className).toContain('min-h-11');
+    expect(field.className).toContain('sm:pointer-fine:min-h-10');
+  });
+
   it('renders CAP, Comune and Provincia inputs with the given values', () => {
     render(
       <StructuredAddressFields

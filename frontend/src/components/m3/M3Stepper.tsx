@@ -56,7 +56,7 @@ const StepItem = memo(({ index, label, state, selectable, onSelect }: StepItemPr
     </>
   );
 
-  const itemClass = 'flex min-h-11 items-center gap-2 rounded-full';
+  const itemClass = 'flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full';
 
   return (
     <li className="flex items-center">

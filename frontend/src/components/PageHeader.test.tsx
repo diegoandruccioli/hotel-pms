@@ -100,6 +100,15 @@ describe('PageHeader', () => {
     expect(screen.queryByRole('button', { name: 'back' })).not.toBeInTheDocument();
   });
 
+  it('makes the back button a 44 px target (40 px with a mouse)', () => {
+    render(<PageHeader title="Guests" onBack={vi.fn()} />);
+    const back = screen.getByRole('button', { name: 'back' });
+    expect(back.className).toContain('min-h-11');
+    expect(back.className).toContain('min-w-11');
+    expect(back.className).toContain('sm:pointer-fine:min-h-10');
+    expect(back.className).toContain('sm:pointer-fine:min-w-10');
+  });
+
   it('calls onBack when the back button is clicked', () => {
     const onBack = vi.fn();
     render(<PageHeader title="Guests" onBack={onBack} />);

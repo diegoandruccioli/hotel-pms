@@ -33,6 +33,11 @@ describe('PasswordVisibilityToggle', () => {
     expect(btn.className).toContain('sm:pointer-fine:size-10');
   });
 
+  it('does not shrink below its size when the input next to it is wide', () => {
+    render(<PasswordVisibilityToggle visible={false} onToggle={vi.fn()} />);
+    expect(screen.getByLabelText('show_password').className).toContain('shrink-0');
+  });
+
   it('should have no accessibility violations', async () => {
     const { container } = render(<PasswordVisibilityToggle visible={false} onToggle={vi.fn()} />);
     const results = await axe(container);

@@ -26,7 +26,8 @@ const GroupNameCell = memo(({ group, onView }: GroupNameCellProps) => {
   return (
     <button
       type="button"
-      className="text-primary hover:underline text-sm font-medium text-left"
+      // Same row height as before: the invisible ::after makes the hit area 44 px tall.
+      className="relative text-primary hover:underline text-sm font-medium text-left after:absolute after:inset-x-0 after:-inset-y-3"
       onClick={handleClick}
     >
       {group.name}

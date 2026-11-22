@@ -62,7 +62,7 @@ export const PageHeader = ({
           <button
             type="button"
             onClick={onBack}
-            className="p-2 rounded-full hover:bg-surface-variant transition-colors text-on-surface-variant"
+            className="inline-flex items-center justify-center min-h-11 min-w-11 sm:pointer-fine:min-h-10 sm:pointer-fine:min-w-10 p-2 rounded-full hover:bg-surface-variant transition-colors text-on-surface-variant"
             aria-label={t('back')}
           >
             <MaterialIcon name="arrow_back" />

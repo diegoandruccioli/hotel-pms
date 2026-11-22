@@ -22,6 +22,13 @@ describe('M3ErrorState', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
+  it('gives the retry button a 44 px touch target (40 px with a mouse)', () => {
+    render(<M3ErrorState title="Error" message="Something went wrong" retryLabel="Try again" onRetry={vi.fn()} />);
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    expect(retry.className).toContain('min-h-11');
+    expect(retry.className).toContain('sm:pointer-fine:min-h-10');
+  });
+
   it('calls onRetry when the retry button is clicked', () => {
     const onRetry = vi.fn();
     render(<M3ErrorState title="Error" message="Something went wrong" retryLabel="Try again" onRetry={onRetry} />);
