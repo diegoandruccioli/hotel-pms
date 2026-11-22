@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { stayService } from '../services';
 import type { HotelSettingsResponse, HotelSettingsRequest } from '../types';
 import { M3LoadingState } from '../components/m3';
+import { M3ErrorState } from '../components/m3';
 import { M3Button } from '../components/m3';
 import { M3Card } from '../components/m3';
 import { M3StatusChip } from '../components/m3';
@@ -48,6 +49,7 @@ export function HotelProfile() {
   const [credentialsConfigured, setCredentialsConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const profileSchema = useMemo(() => z.object({
@@ -56,7 +58,9 @@ export function HotelProfile() {
     logoUrl: z.union([z.string().url(t('common:err_invalid_url')), z.literal('')]),
   }), [t]);
 
-  useEffect(() => {
+  const loadProfile = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
     stayService
       .getHotelSettings()
       .then((s: HotelSettingsResponse) => {
@@ -80,9 +84,13 @@ export function HotelProfile() {
         });
         setCredentialsConfigured(s.alloggiatiCredentialsConfigured);
       })
-      .catch(() => addToast(t('err_profile_save'), 'error'))
+      .catch((err: unknown) => setLoadError(getErrorMessage(err, t('hotel_profile_load_failed'))))
       .finally(() => setLoading(false));
-  }, [addToast, t]);
+  }, [t]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   const handleChange = useCallback(
     (field: keyof HotelSettingsRequest) =>
@@ -149,6 +157,26 @@ export function HotelProfile() {
   if (loading) {
     return (
       <M3LoadingState label={t('common:loading')} plain className="h-auto py-24" />
+    );
+  }
+
+  // No form without the stored profile: saving the blank defaults would overwrite it.
+  if (loadError !== null) {
+    return (
+      <div className="space-y-6 max-w-6xl mx-auto pb-10">
+        <SettingsPageHeader
+          icon="apartment"
+          title={t('hotel_profile_title')}
+          subtitle={t('hotel_profile_subtitle')}
+          onBack={handleBack}
+        />
+        <M3ErrorState
+          title={t('hotel_profile_load_title')}
+          message={loadError}
+          retryLabel={t('common:try_again')}
+          onRetry={loadProfile}
+        />
+      </div>
     );
   }
 

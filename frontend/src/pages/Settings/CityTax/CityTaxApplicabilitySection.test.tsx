@@ -34,6 +34,24 @@ describe('CityTaxApplicabilitySection', () => {
     await waitFor(() => expect(screen.getByLabelText(SELECT_LABEL)).toHaveValue('NOT_APPLICABLE'));
   });
 
+  it('shows a load error with a retry instead of an editable select when loading fails', async () => {
+    vi.mocked(stayService.getCityTaxApplicability)
+      .mockRejectedValueOnce(mockAxiosErrorWithDetail('INTERNAL_SERVER_ERROR', 500));
+    vi.mocked(stayService.getCityTaxApplicability).mockResolvedValueOnce({ applicability: 'APPLICABLE' });
+    render(<CityTaxApplicabilitySection />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('city_tax_applicability_load_title');
+    expect(alert).toHaveTextContent('INTERNAL_SERVER_ERROR');
+    expect(screen.queryByLabelText(SELECT_LABEL)).not.toBeInTheDocument();
+    expect(mockAddToast).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'common:try_again' }));
+
+    await waitFor(() => expect(screen.getByLabelText(SELECT_LABEL)).toHaveValue('APPLICABLE'));
+    expect(stayService.getCityTaxApplicability).toHaveBeenCalledTimes(2);
+  });
+
   it('saves a new applicability on change', async () => {
     vi.mocked(stayService.updateCityTaxApplicability).mockResolvedValue({ applicability: 'APPLICABLE' });
     render(<CityTaxApplicabilitySection />);

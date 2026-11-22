@@ -34,6 +34,24 @@ describe('HotelCategorySection', () => {
     await waitFor(() => expect(screen.getByText('city_tax_no_category_history')).toBeInTheDocument());
   });
 
+  it('shows a load error with a retry, not a false empty history, when loading fails', async () => {
+    vi.mocked(stayService.getHotelCategoryHistory).mockReset();
+    vi.mocked(stayService.getHotelCategoryHistory).mockRejectedValueOnce(new Error('boom'));
+    vi.mocked(stayService.getHotelCategoryHistory).mockResolvedValueOnce([CATEGORY_ENTRY]);
+    render(<HotelCategorySection />);
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('city_tax_category_load_title');
+    expect(screen.queryByText('city_tax_no_category_history')).not.toBeInTheDocument();
+    expect(mockAddToast).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'common:try_again' }));
+
+    await waitFor(() => expect(screen.getByText('4_STAR')).toBeInTheDocument());
+    expect(stayService.getHotelCategoryHistory).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('shows the current category and the history row after data loads', async () => {
     vi.mocked(stayService.getHotelCategoryHistory).mockResolvedValue([CATEGORY_ENTRY]);
     render(<HotelCategorySection />);

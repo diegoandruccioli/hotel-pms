@@ -4,6 +4,7 @@ import { stayService } from '../../../services';
 import type { CityTaxApplicability } from '../../../types';
 import { M3Card } from '../../../components/m3';
 import { M3LoadingState } from '../../../components/m3';
+import { M3ErrorState } from '../../../components/m3';
 import { M3Select } from '../../../components/m3';
 import { useToastStore } from '../../../store';
 import { getErrorMessage } from '../../../utils';
@@ -18,21 +19,20 @@ export const CityTaxApplicabilitySection = () => {
   const [applicability, setApplicability] = useState<CityTaxApplicability | ''>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const loadApplicability = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
+    stayService.getCityTaxApplicability()
+      .then((data) => setApplicability(data.applicability))
+      .catch((err: unknown) => setLoadError(getErrorMessage(err, t('city_tax_err_loading_applicability'))))
+      .finally(() => setLoading(false));
+  }, [t]);
 
   useEffect(() => {
-    let cancelled = false;
-    stayService.getCityTaxApplicability()
-      .then((data) => {
-        if (!cancelled) setApplicability(data.applicability);
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) addToast(getErrorMessage(err, t('city_tax_err_loading_applicability')), 'error');
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [addToast, t]);
+    loadApplicability();
+  }, [loadApplicability]);
 
   const options = useMemo(() => [
     { value: 'UNKNOWN', label: t('city_tax_applicability_unknown') },
@@ -65,6 +65,13 @@ export const CityTaxApplicabilitySection = () => {
 
       {loading ? (
         <M3LoadingState label={t('common:loading')} plain className="h-16" />
+      ) : loadError !== null ? (
+        <M3ErrorState
+          title={t('city_tax_applicability_load_title')}
+          message={loadError}
+          retryLabel={t('common:try_again')}
+          onRetry={loadApplicability}
+        />
       ) : (
         <M3Select
           label={t('city_tax_applicability_label')}

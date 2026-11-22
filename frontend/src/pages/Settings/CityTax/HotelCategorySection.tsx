@@ -7,6 +7,7 @@ import { M3Button } from '../../../components/m3';
 import { M3Card } from '../../../components/m3';
 import { M3EmptyState } from '../../../components/m3';
 import { M3LoadingState } from '../../../components/m3';
+import { M3ErrorState } from '../../../components/m3';
 import { M3Table, M3TableRow, M3TableCell } from '../../../components/m3';
 import { M3TextField } from '../../../components/m3';
 import { useToastStore } from '../../../store';
@@ -31,20 +32,22 @@ export const HotelCategorySection = () => {
   const [history, setHistory] = useState<HotelCategoryHistoryResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [formData, setFormData] = useState<HotelCategoryHistoryRequest>(EMPTY_CATEGORY_FORM);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const loadHistory = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await stayService.getHotelCategoryHistory();
       setHistory(data);
     } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('city_tax_err_loading_category')), 'error');
+      setLoadError(getErrorMessage(err, t('city_tax_err_loading_category')));
     } finally {
       setLoading(false);
     }
-  }, [addToast, t]);
+  }, [t]);
 
   useEffect(() => {
     loadHistory();
@@ -134,6 +137,13 @@ export const HotelCategorySection = () => {
 
       {loading ? (
         <M3LoadingState label={t('common:loading')} plain className="h-24" />
+      ) : loadError !== null ? (
+        <M3ErrorState
+          title={t('city_tax_category_load_title')}
+          message={loadError}
+          retryLabel={t('common:try_again')}
+          onRetry={loadHistory}
+        />
       ) : history.length === 0 ? (
         <M3EmptyState icon="history" title={t('city_tax_no_category_history')} className="py-4" />
       ) : (

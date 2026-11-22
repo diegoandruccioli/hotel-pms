@@ -54,12 +54,22 @@ describe('SettingsPrivacy', () => {
     expect(screen.getByText(/privacy_years_value.*"count":10/)).toBeInTheDocument();
   });
 
-  it('shows an error toast when loading settings fails', async () => {
+  it('shows a load error with a retry instead of an empty card when loading fails', async () => {
     vi.mocked(guestService.getPrivacySettings)
-      .mockRejectedValue(mockAxiosErrorWithDetail('INTERNAL_SERVER_ERROR', 500));
+      .mockRejectedValueOnce(mockAxiosErrorWithDetail('INTERNAL_SERVER_ERROR', 500));
+    vi.mocked(guestService.getPrivacySettings).mockResolvedValueOnce(SETTINGS);
     renderPage();
 
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('INTERNAL_SERVER_ERROR', 'error'));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('privacy_load_title');
+    expect(alert).toHaveTextContent('INTERNAL_SERVER_ERROR');
+    expect(mockAddToast).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'common:try_again' }));
+
+    await waitFor(() => expect(screen.getByDisplayValue('5')).toBeInTheDocument());
+    expect(guestService.getPrivacySettings).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('rejects a retention value below the TULPS minimum before calling the API', async () => {

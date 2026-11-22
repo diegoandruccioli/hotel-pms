@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { guestService } from '../../services';
 import type { GuestPrivacySettingsResponse } from '../../types';
 import { M3LoadingState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3Card } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
@@ -27,19 +28,21 @@ export const SettingsPrivacy = () => {
   const [saving, setSaving] = useState(false);
   const [retentionYears, setRetentionYears] = useState('');
   const [fieldError, setFieldError] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await guestService.getPrivacySettings();
       setSettings(data);
       setRetentionYears(String(data.guestRetentionYears));
     } catch (err: unknown) {
-      addToast(getErrorMessage(err, t('privacy_err_loading')), 'error');
+      setLoadError(getErrorMessage(err, t('privacy_err_loading')));
     } finally {
       setLoading(false);
     }
-  }, [addToast, t]);
+  }, [t]);
 
   useEffect(() => {
     loadSettings();
@@ -88,6 +91,13 @@ export const SettingsPrivacy = () => {
 
         {loading ? (
           <M3LoadingState label={t('common:loading')} plain className="h-24" />
+        ) : loadError !== null ? (
+          <M3ErrorState
+            title={t('privacy_load_title')}
+            message={loadError}
+            retryLabel={t('common:try_again')}
+            onRetry={loadSettings}
+          />
         ) : settings && (
           <>
             <form onSubmit={handleSubmit} noValidate className="grid grid-cols-2 gap-4 items-end">
