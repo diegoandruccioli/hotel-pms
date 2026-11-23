@@ -10,6 +10,8 @@ import { useCreateReservationGroup } from '../../hooks/queries';
 import { inventoryService } from '../../services';
 import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
+import { useSnapshotDirty } from '../../hooks/useSnapshotDirty';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import type { GuestResponseDTO, ReservationGroupCreateRequest, RoomResponse } from '../../types';
 
 let rowIdCounter = 0;
@@ -36,6 +38,17 @@ export const ReservationGroupForm = () => {
   const [rows, setRows] = useState<RoomingListRowState[]>([newRow()]);
   const [availableRooms, setAvailableRooms] = useState<RoomResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  // Row ids are generated per row, so they are left out of the comparison.
+  const { dirty } = useSnapshotDirty(
+    JSON.stringify([name, companyName, contactGuest?.id, checkInDate, checkOutDate, groupRatePerNight, notes,
+      openMasterFolio, rows.map((r) => [r.guest?.id, r.roomId, r.expectedGuests, r.billedToMasterFolio])]),
+    true,
+  );
+  const { allowNavigation } = useUnsavedChangesGuard(
+    dirty && !createGroup.isPending,
+    t('unsaved_subject_group'),
+  );
 
   useEffect(() => {
     if (!checkInDate || !checkOutDate) {
@@ -109,12 +122,13 @@ export const ReservationGroupForm = () => {
     try {
       const created = await createGroup.mutateAsync(request);
       addToast(t('group_created_success'), 'success');
+      allowNavigation();
       navigate(`/reservations/groups/${created.id}`);
     } catch (err: unknown) {
       setError(getErrorMessage(err, t('group_create_failed')));
     }
   }, [getValidationError, contactGuest, name, companyName, checkInDate, checkOutDate, groupRatePerNight,
-      notes, openMasterFolio, rows, createGroup, addToast, navigate, t]);
+      notes, openMasterFolio, rows, createGroup, addToast, navigate, t, allowNavigation]);
 
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value), []);
   const handleCompanyChange = useCallback(

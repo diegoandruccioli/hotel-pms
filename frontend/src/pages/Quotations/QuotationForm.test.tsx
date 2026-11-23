@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import { createElement, Fragment, type ChangeEvent, type ReactNode } from 'react';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop -- test-only mock components, not the real perf-sensitive render path */
@@ -10,6 +10,12 @@ import { reservationService } from '../../services';
 import { quotationService } from '../../services';
 import { guestService } from '../../services';
 import { renderWithQuery } from '../../test-utils';
+import { renderGuarded } from '../../test-utils/renderGuarded';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
+}));
 
 vi.mock('../../services/inventoryService');
 vi.mock('../../services/reservationService');
@@ -88,6 +94,43 @@ describe('QuotationForm', () => {
       </Routes>
     </MemoryRouter>
   );
+
+  describe('unsaved changes guard', () => {
+    const renderGuardedForm = async () => {
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const view = renderGuarded(<QuotationForm />, (node) => (
+        <QueryClientProvider client={queryClient}>{node}</QueryClientProvider>
+      ));
+      await waitFor(() => expect(screen.getByTestId('room-mock')).toBeInTheDocument());
+      return view;
+    };
+
+    it('lets the user leave a form they did not touch', async () => {
+      const { router } = await renderGuardedForm();
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('asks before leaving after an edit, naming the quotation', async () => {
+      const { router } = await renderGuardedForm();
+      fireEvent.click(screen.getByText('toggle_new_prospect'));
+      fireEvent.change(screen.getByLabelText('label_prospect_first_name'), { target: { value: 'Mario' } });
+      fireEvent.click(screen.getByText('leave page'));
+
+      expect(router.state.location.pathname).toBe('/page');
+      expect(screen.getByText('common:unsaved_subject_quotation')).toBeInTheDocument();
+    });
+
+    it('stops asking once the edit is put back', async () => {
+      const { router } = await renderGuardedForm();
+      const validUntil = screen.getByLabelText('label_valid_until') as HTMLInputElement;
+      const original = validUntil.value;
+      fireEvent.change(validUntil, { target: { value: '2031-01-01' } });
+      fireEvent.change(validUntil, { target: { value: original } });
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+  });
 
   it('renders heading and room mock after data loads', async () => {
     renderForm();

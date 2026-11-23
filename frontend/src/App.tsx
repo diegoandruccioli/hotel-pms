@@ -5,6 +5,7 @@ import {
 import { AuthLayout, MainLayout } from './layouts';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { UnsavedChangesProvider } from './components/UnsavedChangesProvider';
 import { MaterialIcon } from './components/MaterialIcon';
 import { useAuthStore } from './store';
 import { authService } from './services';
@@ -60,9 +61,11 @@ function PageFallback() {
 function RootLayout() {
   return (
     <ErrorBoundary>
-      <Suspense fallback={<PageFallback />}>
-        <Outlet />
-      </Suspense>
+      <UnsavedChangesProvider>
+        <Suspense fallback={<PageFallback />}>
+          <Outlet />
+        </Suspense>
+      </UnsavedChangesProvider>
     </ErrorBoundary>
   );
 }

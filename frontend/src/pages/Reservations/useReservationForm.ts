@@ -7,6 +7,8 @@ import type { GuestResponseDTO, RoomResponse } from '../../types';
 import type { ReservationRequest, ReservationResponse, ReservationStatus } from '../../types';
 import { addDays, format, isValid } from 'date-fns';
 import { isReservationEditable } from '../../lib/reservationStatus';
+import { useSnapshotDirty } from '../../hooks/useSnapshotDirty';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
 export const STEP_DATES = 0;
 export const STEP_ROOMS = 1;
@@ -317,6 +319,14 @@ export const useReservationForm = () => {
   // double click (or panel Save + Confirm) could otherwise send the request twice.
   const savingRef = useRef(false);
 
+  // Unsaved edits (R9). The step is not an edit. A new reservation starts from what the page was
+  // opened with; an existing one from what was loaded (`savedPricing` is set with the load).
+  const { dirty } = useSnapshotDirty(
+    JSON.stringify([selectedGuest?.id, checkInDate, checkOutDate, expectedGuests, selectedRoomIds, status]),
+    !isView && !loadFailed && (id ? savedPricing !== null && !fetching : true),
+  );
+  const { allowNavigation } = useUnsavedChangesGuard(dirty && !loading, t('unsaved_subject_reservation'));
+
   // Back to wherever the user came from (group detail, night audit, quotation...);
   // a direct visit has no in-app history to return to, so fall back to the list.
   const goBack = useCallback(() => {
@@ -361,6 +371,7 @@ export const useReservationForm = () => {
       } else {
         await reservationService.createReservation(request);
       }
+      allowNavigation();
       if (id) goBack(); else navigate('/reservations');
     } catch (err: unknown) {
       const e = err as {response?: {data?: {detail?: string; errorCode?: string}}, message?: string};
@@ -379,7 +390,7 @@ export const useReservationForm = () => {
       setLoading(false);
     }
   }, [isView, validateStep, selectedGuest, reservationSchema, checkInDate, checkOutDate, expectedGuests,
-      status, selectedRoomIds, version, id, navigate, goBack, t]);
+      status, selectedRoomIds, version, id, navigate, goBack, t, allowNavigation]);
 
   /** Enter inside a step moves forward; only the last step actually saves. */
   const handleFormSubmit = useCallback((e: React.FormEvent) => {

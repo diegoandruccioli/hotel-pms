@@ -2,10 +2,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { createElement, Fragment, type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderWithQuery as render } from '../../test-utils';
+import { renderGuarded } from '../../test-utils/renderGuarded';
 import { ReservationGroupForm } from './ReservationGroupForm';
 import { inventoryService } from '../../services';
 import { reservationGroupService } from '../../services';
+
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
+}));
 
 vi.mock('../../services/inventoryService');
 vi.mock('../../services/reservationGroupService', () => ({
@@ -55,6 +62,39 @@ describe('ReservationGroupForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(inventoryService.getAvailableRooms).mockResolvedValue([ROOM] as never);
+  });
+
+  describe('unsaved changes guard', () => {
+    const renderGuardedForm = () => {
+      const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      return renderGuarded(<ReservationGroupForm />, (node) => (
+        <QueryClientProvider client={queryClient}>{node}</QueryClientProvider>
+      ));
+    };
+
+    it('lets the user leave a form they did not touch', () => {
+      const { router } = renderGuardedForm();
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('asks before leaving after an edit, naming the group booking', () => {
+      const { router } = renderGuardedForm();
+      fireEvent.change(screen.getByLabelText('group_name'), { target: { value: 'Acme Corp Offsite' } });
+      fireEvent.click(screen.getByText('leave page'));
+
+      expect(router.state.location.pathname).toBe('/page');
+      expect(screen.getByText('unsaved_subject_group')).toBeInTheDocument();
+    });
+
+    it('stops asking once the edit is put back', () => {
+      const { router } = renderGuardedForm();
+      const name = screen.getByLabelText('group_name');
+      fireEvent.change(name, { target: { value: 'Acme' } });
+      fireEvent.change(name, { target: { value: '' } });
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
   });
 
   it('should submit a new group with one room', async () => {

@@ -12,6 +12,7 @@ import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
 import { PasswordRequirementsChecklist } from '../../components/PasswordRequirementsChecklist';
 import { CHANGE_PASSWORD_PATH } from '../../components/ProtectedRoute';
 import { isPasswordValid } from '../../utils';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
 /** Where to go after a forced change: the page the user was heading to, if it is a same-app page worth returning to. */
 const returnTarget = (state: unknown): string => {
@@ -34,6 +35,11 @@ export const SettingsPassword = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The current password is left out: a password manager may fill it in on its own.
+  const { allowNavigation } = useUnsavedChangesGuard(
+    !loading && (newPassword !== '' || confirmPassword !== ''),
+    t('unsaved_subject_password'),
+  );
 
   const handleCurrentPasswordChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => setCurrentPassword(e.target.value),
@@ -82,6 +88,7 @@ export const SettingsPassword = () => {
         // flag locally: left set, the route guard would bounce the user straight back.
         if (user) checkAuth({ ...user, mustChangePassword: false });
       }
+      allowNavigation();
       if (mustChangePassword) {
         navigate(returnTarget(location.state));
       } else {
@@ -93,7 +100,7 @@ export const SettingsPassword = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPassword, newPassword, confirmPassword, t, addToast, checkAuth, navigate, mustChangePassword, user, location.state]);
+  }, [currentPassword, newPassword, confirmPassword, t, addToast, checkAuth, navigate, mustChangePassword, user, location.state, allowNavigation]);
 
   return (
     <div className="space-y-6">

@@ -15,6 +15,7 @@ import { StructuredAddressFields } from '../components/StructuredAddressFields';
 import { SettingsPageHeader } from '../components/SettingsPageHeader';
 import { useToastStore } from '../store';
 import { getErrorMessage } from '../utils';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { HotelDocumentPreview } from './HotelProfile/HotelDocumentPreview';
 
 const VAT_NUMBER_REGEX = /^\d{11}$/;
@@ -51,6 +52,11 @@ export function HotelProfile() {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // The form as last loaded or saved, to tell whether there is anything to lose.
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
+
+  const dirty = savedSnapshot !== null && !saving && JSON.stringify(form) !== savedSnapshot;
+  useUnsavedChangesGuard(dirty, t('common:unsaved_subject_hotel_profile'));
 
   const profileSchema = useMemo(() => z.object({
     vatNumber: z.union([z.string().regex(VAT_NUMBER_REGEX, t('common:err_invalid_vat')), z.literal('')]),
@@ -64,7 +70,7 @@ export function HotelProfile() {
     stayService
       .getHotelSettings()
       .then((s: HotelSettingsResponse) => {
-        setForm({
+        const loaded: HotelSettingsRequest = {
           alloggiatiAutoSend: s.alloggiatiAutoSend,
           hotelName: s.hotelName ?? '',
           address: s.address ?? '',
@@ -81,7 +87,9 @@ export function HotelProfile() {
           provincia: s.provincia ?? '',
           timezone: s.timezone,
           housekeepingDayCutoffHour: s.housekeepingDayCutoffHour,
-        });
+        };
+        setForm(loaded);
+        setSavedSnapshot(JSON.stringify(loaded));
         setCredentialsConfigured(s.alloggiatiCredentialsConfigured);
       })
       .catch((err: unknown) => setLoadError(getErrorMessage(err, t('hotel_profile_load_failed'))))
@@ -144,7 +152,10 @@ export function HotelProfile() {
     setSaving(true);
     try {
       const updated = await stayService.updateHotelSettings({ ...form, ...result.data });
-      setForm((prev) => ({ ...prev, alloggiatiPassword: '', alloggiatiWsKey: '' }));
+      // Credentials are write-only: they are blank again after a save, like after a load.
+      const saved: HotelSettingsRequest = { ...form, ...result.data, alloggiatiPassword: '', alloggiatiWsKey: '' };
+      setForm(saved);
+      setSavedSnapshot(JSON.stringify(saved));
       setCredentialsConfigured(updated.alloggiatiCredentialsConfigured);
       addToast(t('toast_profile_saved'), 'success');
     } catch (err: unknown) {

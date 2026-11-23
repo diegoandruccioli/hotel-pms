@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, memo, type ChangeEvent, type
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useFormatters } from '../../../hooks';
+import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
 import { stayService } from '../../../services';
 import type { CityTaxRateResponse } from '../../../types';
 import { M3Button } from '../../../components/m3';
@@ -48,6 +49,10 @@ export const CityTaxRatesSection = () => {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formData, setFormData] = useState<RateFormState>(EMPTY_RATE_FORM);
+  useUnsavedChangesGuard(
+    !saving && JSON.stringify(formData) !== JSON.stringify(EMPTY_RATE_FORM),
+    t('common:unsaved_subject_city_tax_rate'),
+  );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const loadRates = useCallback(async () => {

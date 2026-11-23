@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useFormatters } from '../../hooks/useFormatters';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { Alert } from '../../components/Alert';
 import { M3LoadingState } from '../../components/m3';
 import { PageHeader } from '../../components/PageHeader';
@@ -165,7 +166,12 @@ export const CheckInForm = memo(() => {
     });
   }, [guestId]);
 
+  // Prefilled data comes back from the server, so only the user's own edits count as unsaved.
+  const [edited, setEdited] = useState(false);
+  const { allowNavigation } = useUnsavedChangesGuard(edited && !loading, t('common:unsaved_subject_check_in'));
+
   const handleGuestChange = useCallback((index: number, patch: Partial<IdentifiableGuest>) => {
+    setEdited(true);
     setGuests(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], ...patch };
@@ -176,8 +182,14 @@ export const CheckInForm = memo(() => {
     });
   }, []);
 
-  const addGuest = useCallback(() => setGuests(prev => [...prev, emptyGuest(false)]), []);
-  const removeGuest = useCallback((index: number) => setGuests(prev => prev.filter((_, i) => i !== index)), []);
+  const addGuest = useCallback(() => {
+    setEdited(true);
+    setGuests(prev => [...prev, emptyGuest(false)]);
+  }, []);
+  const removeGuest = useCallback((index: number) => {
+    setEdited(true);
+    setGuests(prev => prev.filter((_, i) => i !== index));
+  }, []);
   const handleBack = useCallback(() => navigate(-1), [navigate]);
 
   const handleSubmit = useCallback(async (e: FormEvent) => {
@@ -235,6 +247,7 @@ export const CheckInForm = memo(() => {
       // the page we return to does not show a stale "Check-in" action.
       void queryClient.invalidateQueries({ queryKey: queryKeys.reservationGroups.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.reservations.all });
+      allowNavigation();
       navigate(state?.returnTo ?? '/stays', { replace: true });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string };
@@ -242,7 +255,7 @@ export const CheckInForm = memo(() => {
     } finally {
       setLoading(false);
     }
-  }, [reservationId, effectiveState, guests, navigate, t, addToast, state?.returnTo]);
+  }, [reservationId, effectiveState, guests, navigate, t, addToast, state?.returnTo, allowNavigation]);
 
   const checklist = useMemo(
     () => buildCheckInChecklist({ guests, cityTaxWarning, checkOutDate: reservationDates?.checkOut }),
