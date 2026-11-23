@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import type { Role } from '../types';
 import { AdminUsers } from './AdminUsers';
@@ -55,6 +55,9 @@ const USER_INACTIVE = {
   id: 'u2', username: 'bob', email: 'bob@hotel.com',
   role: 'OWNER' as Role, active: false, mustChangePassword: false, createdAt: '',
 };
+
+// A function result, not an array literal in the JSX scope (react-perf).
+const toEntries = (entry: string): string[] => [entry];
 
 describe('AdminUsers', () => {
   beforeEach(() => {
@@ -143,6 +146,73 @@ describe('AdminUsers', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'btn_activate' }));
     await waitFor(() => expect(userService.activateUser).toHaveBeenCalledWith('u2'));
     expect(screen.queryByText('confirm')).not.toBeInTheDocument();
+  });
+
+  describe('list state in the URL', () => {
+    const ADMIN_USER = { ...USER_ACTIVE, id: 'u3', username: 'carol', email: 'carol@hotel.com', role: 'ADMIN' as Role };
+
+    const LocationProbe = () => {
+      const loc = useLocation();
+      return <output data-testid="location">{`${loc.pathname}${loc.search}`}</output>;
+    };
+
+    const renderAt = async (entry: string) => {
+      vi.mocked(userService.listUsers).mockResolvedValue([USER_ACTIVE, USER_INACTIVE, ADMIN_USER]);
+      const entries = toEntries(entry);
+      renderWithQuery(
+        <MemoryRouter initialEntries={entries}>
+          <AdminUsers />
+          <LocationProbe />
+        </MemoryRouter>,
+      );
+      await screen.findByTestId('location');
+      await waitFor(() => expect(screen.getByRole('button', { name: 'filter_all' })).toBeInTheDocument());
+    };
+
+    const names = () => screen.queryAllByText(/^(alice|bob|carol)$/).map((el) => el.textContent);
+
+    it('opens with the filter and the sort from the URL', async () => {
+      await renderAt('/admin/users?filter=OWNER&sort=email&dir=desc');
+      expect(screen.getByRole('button', { name: 'users_filter_owner' })).toHaveAttribute('aria-pressed', 'true');
+      expect(names()).toEqual(['bob']);
+    });
+
+    it('sorts by the URL: email descending lists carol, bob, alice', async () => {
+      await renderAt('/admin/users?sort=email&dir=desc');
+      await waitFor(() => expect(names()).toEqual(['carol', 'bob', 'alice']));
+    });
+
+    it('ignores an unknown filter, sort or direction in silence', async () => {
+      await renderAt('/admin/users?filter=BOGUS&sort=password&dir=up');
+      expect(screen.getByRole('button', { name: 'filter_all' })).toHaveAttribute('aria-pressed', 'true');
+      expect(names()).toEqual(['alice', 'bob', 'carol']);
+      expect(mockAddToast).not.toHaveBeenCalled();
+    });
+
+    it('writes the chosen filter to the URL and drops it again for "all"', async () => {
+      await renderAt('/admin/users');
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/admin\/users$/);
+
+      fireEvent.click(screen.getByRole('button', { name: 'users_filter_owner' }));
+      expect(screen.getByTestId('location')).toHaveTextContent('/admin/users?filter=OWNER');
+
+      fireEvent.click(screen.getByRole('button', { name: 'filter_all' }));
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/admin\/users$/);
+    });
+
+    it('writes the sort to the URL', async () => {
+      await renderAt('/admin/users');
+      const emailHeader = screen.getByRole('columnheader', { name: /col_email/ });
+      fireEvent.click(within(emailHeader).getByRole('button'));
+      expect(screen.getByTestId('location')).toHaveTextContent('/admin/users?sort=email');
+    });
+
+    it('keeps the search text, which holds usernames and emails, out of the URL', async () => {
+      await renderAt('/admin/users');
+      fireEvent.change(screen.getByRole('searchbox', { name: 'users_search_label' }), { target: { value: 'bob@' } });
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/admin\/users$/);
+    });
+
   });
 
   describe('search, filters and summary', () => {

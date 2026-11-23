@@ -1,5 +1,6 @@
 import { useFormatters } from '../hooks';
 import { useState, useCallback, memo, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { ColumnDef, SortingState } from '@tanstack/react-table';
 import type { RestaurantOrderResponse } from '../types';
 import { MaterialIcon } from '../components/MaterialIcon';
@@ -23,6 +24,10 @@ import { queryKeys } from '../lib';
 import { OrderFormModal } from './Restaurant/OrderFormModal';
 import { OrderDetailModal } from './Restaurant/OrderDetailModal';
 import { MenuSection } from './Restaurant/MenuSection';
+import {
+  orderListParamsToSearch, readOrderListParams,
+  type OrderListParams, type OrderSortField,
+} from './Restaurant/orderListParams';
 
 const CONFIRMABLE_STATUSES = new Set<string>(['PENDING', 'PREPARED']);
 const EMPTY_ORDERS: RestaurantOrderResponse[] = [];
@@ -33,11 +38,6 @@ const FILTER_LABEL_KEYS: Record<OrderFilter, string> = {
   CLOSED: 'order_filter_closed',
   CANCELLED: 'order_filter_cancelled',
 };
-
-type OrderSortField = 'orderDate' | 'roomNumber' | 'guestDisplayName';
-type SortDir = 'asc' | 'desc';
-const DEFAULT_ORDER_SORT_FIELD: OrderSortField = 'orderDate';
-const DEFAULT_ORDER_SORT_DIR: SortDir = 'desc';
 
 interface OrderActionsCellProps {
   order: RestaurantOrderResponse;
@@ -83,10 +83,13 @@ export const Restaurant = memo(() => {
   const queryClient = useQueryClient();
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<RestaurantOrderResponse | null>(null);
-  const [orderFilter, setOrderFilter] = useState<OrderFilter>('ALL');
-
-  const [sortField, setSortField] = useState<OrderSortField>(DEFAULT_ORDER_SORT_FIELD);
-  const [sortDir, setSortDir] = useState<SortDir>(DEFAULT_ORDER_SORT_DIR);
+  // Status filter and sort live in the URL (back, refresh and shared links keep them).
+  const [urlParams, setUrlParams] = useSearchParams();
+  const { status: orderFilter, sortField, sortDir } = readOrderListParams(urlParams);
+  const updateList = useCallback((patch: Partial<OrderListParams>) => {
+    setUrlParams(orderListParamsToSearch({ status: orderFilter, sortField, sortDir, ...patch }), { replace: true });
+  }, [setUrlParams, orderFilter, sortField, sortDir]);
+  const handleFilterSelect = useCallback((status: OrderFilter) => updateList({ status }), [updateList]);
 
   const { data: ordersData, isLoading: loading, error: queryError, refetch } = useOrders();
   const orders = ordersData ?? EMPTY_ORDERS;
@@ -116,9 +119,8 @@ export const Restaurant = memo(() => {
   );
 
   const handleOrderSortingChange = useCallback((next: SortingState) => {
-    setSortField(next[0].id as OrderSortField);
-    setSortDir(next[0].desc ? 'desc' : 'asc');
-  }, []);
+    updateList({ sortField: next[0].id as OrderSortField, sortDir: next[0].desc ? 'desc' : 'asc' });
+  }, [updateList]);
 
   const visibleOrders = useMemo(() => {
     const filtered = orders.filter((o) => matchesOrderFilter(o.status, orderFilter));
@@ -208,7 +210,7 @@ export const Restaurant = memo(() => {
             label={filterLabel(f)}
             value={f}
             selected={orderFilter === f}
-            onValueSelect={setOrderFilter}
+            onValueSelect={handleFilterSelect}
           />
         ))}
       </div>

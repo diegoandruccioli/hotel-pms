@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { SortingState } from '@tanstack/react-table';
 import type { UserResponse } from '../types';
@@ -18,10 +18,10 @@ import { getErrorMessage } from '../utils';
 import { CreateUserModal } from './AdminUsers/CreateUserModal';
 import { ResetPasswordModal } from './AdminUsers/ResetPasswordModal';
 import { useUserColumns } from './AdminUsers/useUserColumns';
-
-type UserFilter = 'ALL' | 'ADMIN' | 'OWNER' | 'RECEPTIONIST' | 'DEACTIVATED';
-
-const USER_FILTERS: readonly UserFilter[] = ['ALL', 'ADMIN', 'OWNER', 'RECEPTIONIST', 'DEACTIVATED'];
+import {
+  USER_FILTERS, readUserListParams, userListParamsToSearch,
+  type UserFilter, type UserListParams, type UserSortField,
+} from './AdminUsers/userListParams';
 
 const FILTER_LABEL_KEYS: Record<UserFilter, string> = {
   ALL: 'filter_all',
@@ -44,8 +44,6 @@ const ROLE_DESCRIPTIONS = [
 ] as const;
 
 const EMPTY_USERS: UserResponse[] = [];
-const DEFAULT_SORT_FIELD = 'username';
-const DEFAULT_SORT_DIR: 'asc' | 'desc' = 'asc';
 
 function compareUsers(a: UserResponse, b: UserResponse, field: string): number {
   switch (field) {
@@ -70,9 +68,14 @@ export function AdminUsers() {
   const [resetTarget, setResetTarget] = useState<UserResponse | null>(null);
   const [deactivateTarget, setDeactivateTarget] = useState<UserResponse | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filter, setFilter] = useState<UserFilter>('ALL');
-  const [sortField, setSortField] = useState(DEFAULT_SORT_FIELD);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_SORT_DIR);
+  // Role filter and sort live in the URL (back, refresh and shared links keep them); the search
+  // text does not, because it holds usernames and emails.
+  const [urlParams, setUrlParams] = useSearchParams();
+  const { filter, sortField, sortDir } = readUserListParams(urlParams);
+  const updateList = useCallback((patch: Partial<UserListParams>) => {
+    setUrlParams(userListParamsToSearch({ filter, sortField, sortDir, ...patch }), { replace: true });
+  }, [setUrlParams, filter, sortField, sortDir]);
+  const handleFilterSelect = useCallback((value: UserFilter) => updateList({ filter: value }), [updateList]);
 
   const openCreate = useCallback(() => setShowCreate(true), []);
   const closeCreate = useCallback(() => setShowCreate(false), []);
@@ -157,9 +160,8 @@ export function AdminUsers() {
   );
 
   const handleSortingChange = useCallback((next: SortingState) => {
-    setSortField(next[0].id);
-    setSortDir(next[0].desc ? 'desc' : 'asc');
-  }, []);
+    updateList({ sortField: next[0].id as UserSortField, sortDir: next[0].desc ? 'desc' : 'asc' });
+  }, [updateList]);
 
   const getUserRowId = useCallback((u: UserResponse) => u.id, []);
 
@@ -203,7 +205,7 @@ export function AdminUsers() {
                   value={value}
                   selected={filter === value}
                   label={t(FILTER_LABEL_KEYS[value])}
-                  onValueSelect={setFilter}
+                  onValueSelect={handleFilterSelect}
                 />
               ))}
             </ListToolbar>
