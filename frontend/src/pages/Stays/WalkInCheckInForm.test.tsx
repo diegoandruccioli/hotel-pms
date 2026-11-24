@@ -1,4 +1,6 @@
+import { createElement, Fragment, type ReactNode } from 'react';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { renderGuarded } from '../../test-utils/renderGuarded';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -21,6 +23,10 @@ const STATI_WITH_ITALIA_PAST_DEFAULT_SLICE = [
 ];
 const FIANO_COMUNE = { codice: '412058036', descrizione: 'FIANO ROMANO', provincia: 'RM' };
 const PASOR_TIPDOC = { codice: 'PASOR', descrizione: 'PASSAPORTO ORDINARIO' };
+
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -514,6 +520,36 @@ describe('WalkInCheckInForm', () => {
     it('lists the tourist tax as configured once the check resolves', async () => {
       renderComponent();
       await waitFor(() => expect(within(itemOf('checklist_city_tax')).getByText('checklist_city_tax_configured')).toBeInTheDocument());
+    });
+  });
+
+  describe('unsaved changes guard', () => {
+    const renderGuardedForm = async () => {
+      const view = renderGuarded(<WalkInCheckInForm />);
+      await waitFor(() => expect(screen.getByLabelText(/walkin_label_room/i)).toBeInTheDocument());
+      return view;
+    };
+
+    it('lets the user leave a form they did not touch', async () => {
+      const { router } = await renderGuardedForm();
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('asks before leaving after choosing a room, naming the walk-in check-in', async () => {
+      const { router } = await renderGuardedForm();
+      await userEvent.setup().selectOptions(screen.getByLabelText(/walkin_label_room/i), 'r1');
+      fireEvent.click(screen.getByText('leave page'));
+
+      expect(router.state.location.pathname).toBe('/page');
+      expect(screen.getByText('common:unsaved_subject_walk_in')).toBeInTheDocument();
+    });
+
+    it('asks before leaving after typing a check-out date', async () => {
+      const { router } = await renderGuardedForm();
+      fireEvent.change(screen.getByLabelText(/walkin_label_checkout_date/i), { target: { value: '2026-12-31' } });
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/page');
     });
   });
 

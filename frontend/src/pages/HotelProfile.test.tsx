@@ -1,3 +1,4 @@
+import { createElement, Fragment, type ReactNode } from 'react';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -6,6 +7,7 @@ import userEvent from '@testing-library/user-event';
 import { HotelProfile } from './HotelProfile';
 import { stayService } from '../services';
 import { mockAxiosErrorWithDetail } from '../test-utils';
+import { renderGuarded } from '../test-utils/renderGuarded';
 import type { HotelSettingsResponse } from '../types';
 
 // `t`/`i18n` must be module-level stable references: HotelProfile's settings-load
@@ -20,6 +22,10 @@ vi.mock('react-i18next', () => ({
     i18n: stableI18n,
   }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
+}));
+
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
 }));
 
 vi.mock('../services/stayService');
@@ -331,4 +337,59 @@ describe('HotelProfile', () => {
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   }, 30000);
+
+  describe('unsaved changes guard', () => {
+    const renderGuardedPage = async () => {
+      const view = renderGuarded(<HotelProfile />);
+      await waitFor(() => expect(screen.getByText('hotel_profile_title')).toBeInTheDocument());
+      return view;
+    };
+
+    it('lets the user leave a form they did not touch', async () => {
+      const { router } = await renderGuardedPage();
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('asks before leaving after an edit, naming the hotel profile', async () => {
+      const { router } = await renderGuardedPage();
+      fireEvent.change(screen.getByLabelText(/label_hotel_name/i), { target: { value: 'Grand Hotel' } });
+      fireEvent.click(screen.getByText('leave page'));
+
+      expect(router.state.location.pathname).toBe('/page');
+      expect(screen.getByText('common:unsaved_subject_hotel_profile')).toBeInTheDocument();
+    });
+
+    it('stops asking once the edit is put back to the saved value', async () => {
+      const { router } = await renderGuardedPage();
+      const name = screen.getByLabelText(/label_hotel_name/i);
+      fireEvent.change(name, { target: { value: 'Grand Hotel' } });
+      fireEvent.change(name, { target: { value: 'Hotel Test' } });
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('does not ask after a successful save', async () => {
+      const { router } = await renderGuardedPage();
+      fireEvent.change(screen.getByLabelText(/label_hotel_name/i), { target: { value: 'Grand Hotel' } });
+      fireEvent.click(screen.getByRole('button', { name: /btn_save_profile/i }));
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('toast_profile_saved', 'success'));
+
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('still asks after a save that did not go through', async () => {
+      vi.mocked(stayService.updateHotelSettings).mockRejectedValue(new Error('boom'));
+      const { router } = await renderGuardedPage();
+      fireEvent.change(screen.getByLabelText(/label_hotel_name/i), { target: { value: 'Grand Hotel' } });
+      fireEvent.click(screen.getByRole('button', { name: /btn_save_profile/i }));
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalled());
+      // The form is only guarded again once the failed save is over.
+      await waitFor(() => expect(screen.getByRole('button', { name: /btn_save_profile/i })).toBeEnabled());
+
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/page');
+    });
+  });
 });

@@ -1,5 +1,7 @@
+import { createElement, Fragment, type ReactNode } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { renderGuarded } from '../../test-utils/renderGuarded';
 import { axe } from 'vitest-axe';
 import { MemoryRouter } from 'react-router-dom';
 import { SettingsPassword } from './SettingsPassword';
@@ -32,7 +34,11 @@ vi.mock('../../store/authStore', () => ({
   useAuthStore: () => ({ checkAuth: checkAuthMock, user: mockUser }),
 }));
 
-const FORCED_USER = { sub: 'u1', username: 'r4pwtest', role: 'RECEPTIONIST', mustChangePassword: true };
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
+}));
+
+const FORCED_USER ={ sub: 'u1', username: 'r4pwtest', role: 'RECEPTIONIST', mustChangePassword: true };
 
 const renderPage = () => render(<MemoryRouter><SettingsPassword /></MemoryRouter>);
 
@@ -208,5 +214,21 @@ describe('SettingsPassword', () => {
     const { container } = renderPage();
     const results = await axe(container);
     expect(results).toHaveNoViolations();
+  });
+
+  describe('unsaved changes guard', () => {
+    it('lets the user leave an empty form', () => {
+      const { router } = renderGuarded(<SettingsPassword />);
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('asks before leaving once a new password has been typed', () => {
+      const { router } = renderGuarded(<SettingsPassword />);
+      fireEvent.change(screen.getByLabelText('new_password'), { target: { value: 'newPass1' } });
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/page');
+      expect(screen.getByText('unsaved_subject_password')).toBeInTheDocument();
+    });
   });
 });

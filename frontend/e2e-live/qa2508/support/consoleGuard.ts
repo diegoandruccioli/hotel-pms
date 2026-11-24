@@ -68,6 +68,12 @@ export class ConsoleGuard {
     });
     page.on('crash', () => this.push('pageerror', 'PAGE CRASHED', {}));
     page.on('dialog', (dialog) => {
+      // Leaving a form with unsaved edits asks the browser's "leave site?" question. Tests that
+      // navigate away on purpose (goto, reload) just confirm it; it is not a defect to report.
+      if (dialog.type() === 'beforeunload') {
+        void dialog.accept();
+        return;
+      }
       write({ kind: 'dialog', message: dialog.message(), route: this.route, role: this.role, expected: this.expectingDialog });
       if (!this.expectingDialog) {
         // An unexpected native dialog blocks all further automation — surface it

@@ -1,5 +1,7 @@
+import { createElement, Fragment, type ReactNode } from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { renderGuarded } from '../../test-utils/renderGuarded';
 /* eslint-disable react-perf/jsx-no-new-array-as-prop */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
@@ -16,6 +18,10 @@ const ITALIA_STATO = { codice: '100000100', descrizione: 'ITALIA' };
 const FRANCIA_STATO = { codice: '200000100', descrizione: 'FRANCIA' };
 const FIANO_COMUNE = { codice: '412058036', descrizione: 'FIANO ROMANO', provincia: 'RM' };
 const PASOR_TIPDOC = { codice: 'PASOR', descrizione: 'PASSAPORTO ORDINARIO' };
+
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
+}));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -132,6 +138,36 @@ describe('CheckInForm', () => {
     expect(removeBtns).toHaveLength(2);
     await user.click(removeBtns[1]);
     expect(screen.getAllByText('guest_number')).toHaveLength(1);
+  });
+
+  describe('unsaved changes guard', () => {
+    const renderGuardedForm = async () => {
+      const view = renderGuarded(<CheckInForm />, undefined, { guestId: 'g1', roomId: 'r1', expectedGuests: 1 });
+      await waitFor(() => expect(screen.getByText('checkin_title')).toBeInTheDocument());
+      return view;
+    };
+
+    it('lets the user leave a form they did not touch', async () => {
+      const { router } = await renderGuardedForm();
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('asks before leaving after typing a guest detail, naming the check-in', async () => {
+      const { router } = await renderGuardedForm();
+      fireEvent.change(screen.getByLabelText('label_first_name'), { target: { value: 'Mario' } });
+      fireEvent.click(screen.getByText('leave page'));
+
+      expect(router.state.location.pathname).toBe('/page');
+      expect(screen.getByText('common:unsaved_subject_check_in')).toBeInTheDocument();
+    });
+
+    it('asks after adding a guest card', async () => {
+      const { router } = await renderGuardedForm();
+      fireEvent.click(screen.getByRole('button', { name: 'btn_add_guest' }));
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/page');
+    });
   });
 
   describe('deep-link / refresh without location.state', () => {

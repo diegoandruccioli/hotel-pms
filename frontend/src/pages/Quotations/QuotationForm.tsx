@@ -1,4 +1,6 @@
 import { useFormatters } from '../../hooks';
+import { useSnapshotDirty } from '../../hooks/useSnapshotDirty';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { useState, useCallback, useMemo } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -35,6 +37,14 @@ export const QuotationForm = () => {
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const error = submitError ?? draft.loadError;
+
+  // Everything the user can edit; the search text typed to find a guest is not a draft.
+  const { dirty } = useSnapshotDirty(
+    JSON.stringify([recipientMode, selectedGuest?.id, prospectFirstName, prospectLastName, prospectEmail,
+      checkInDate, checkOutDate, expectedGuests, validUntil, options]),
+    !draft.fetching,
+  );
+  const { allowNavigation } = useUnsavedChangesGuard(dirty && !loading, t('common:unsaved_subject_quotation'));
 
   const quotationSchema = useMemo(() => z.object({
     checkInDate: z.string().min(1, t('common:msg_valid_dates')),
@@ -97,10 +107,12 @@ export const QuotationForm = () => {
       if (isEditMode && id) {
         await quotationService.updateQuotation(id, request);
         addToast(t('toast_updated'), 'success');
+        allowNavigation();
         navigate(`/quotations/${id}`);
       } else {
         await quotationService.createQuotation(request);
         addToast(t('toast_created'), 'success');
+        allowNavigation();
         navigate('/quotations');
       }
     } catch (err: unknown) {
@@ -110,7 +122,7 @@ export const QuotationForm = () => {
     }
   }, [recipientMode, selectedGuest, prospectFirstName, prospectLastName, prospectEmail,
       options, checkInDate, checkOutDate, validUntil, expectedGuests,
-      quotationSchema, addToast, t, navigate, isEditMode, id]);
+      quotationSchema, addToast, t, navigate, isEditMode, id, allowNavigation]);
 
   if (draft.fetching) {
     return (

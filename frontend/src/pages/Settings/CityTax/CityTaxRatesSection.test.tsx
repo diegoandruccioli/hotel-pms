@@ -1,9 +1,11 @@
+import { createElement, Fragment, type ReactNode } from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { CityTaxRatesSection } from './CityTaxRatesSection';
 import { stayService } from '../../../services';
 import { mockAxiosErrorWithDetail } from '../../../test-utils';
+import { renderGuarded } from '../../../test-utils/renderGuarded';
 import type { CityTaxRateResponse } from '../../../types';
 
 const stableT = (key: string) => key;
@@ -11,6 +13,10 @@ const stableI18n = { language: 'en' };
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: stableT, i18n: stableI18n }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
+}));
+
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
 }));
 
 vi.mock('../../../services/stayService');
@@ -112,6 +118,40 @@ describe('CityTaxRatesSection', () => {
 
   it('shows the backend detail message on a generic failure', async () => {
     await submitFailingRate('CITY_TAX_RATE_INVALID', 422, '2026-06-01');
+  });
+
+  describe('unsaved changes guard', () => {
+    const renderGuardedSection = async () => {
+      const view = renderGuarded(<CityTaxRatesSection />);
+      await waitFor(() => expect(screen.getByText('city_tax_no_rates')).toBeInTheDocument());
+      return view;
+    };
+
+    it('lets the user leave while the new-rate form is empty', async () => {
+      const { router } = await renderGuardedSection();
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('asks before leaving with a half-filled rate, naming it', async () => {
+      const { router } = await renderGuardedSection();
+      fillRequiredFields('2030-01-01');
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/page');
+      expect(screen.getByText('common:unsaved_subject_city_tax_rate')).toBeInTheDocument();
+    });
+
+    it('does not ask once the rate has been added', async () => {
+      vi.mocked(stayService.createCityTaxRate).mockResolvedValue(RATE);
+      const { router } = await renderGuardedSection();
+      fillRequiredFields('2030-01-01');
+      fireEvent.click(screen.getByText('city_tax_add_rate'));
+      await waitFor(() => expect(stayService.createCityTaxRate).toHaveBeenCalled());
+      await waitFor(() => expect(screen.getByLabelText(/city_tax_amount_per_night/i)).toHaveValue(null));
+
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
   });
 
   it('passes axe accessibility check', async () => {

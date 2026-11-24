@@ -107,7 +107,7 @@ Ogni regola ha: **Regola** · **Perché** · **Come** · **Verifica**.
   - Azioni irreversibili: `M3ConfirmDialog` che **nomina l'oggetto** ("Eliminare la camera 204?") con pulsanti dal verbo preciso ("Elimina camera", non "OK"/"Sì").
   - Vincoli: disabilitare l'azione non ancora possibile *e dire perché* (testo vicino o tooltip accessibile); validare i valori plausibili (importi, date, intervalli) prima dell'invio.
   - Tenere lontane le azioni facilmente confondibili ("Elimina" non accanto a "Modifica").
-  - Modifiche non salvate: avvisare prima di perderle. *(Oggi non c'è un guard standard: in un form lungo, aggiungerlo.)*
+  - Modifiche non salvate: avvisare prima di perderle. In un form a pagina intera usa `useUnsavedChangesGuard(dirty, subject)`: la navigazione interna apre un dialogo che **nomina cosa si perde** ("Continua a modificare" / "Esci senza salvare"), la chiusura della scheda usa l'avviso del browser. Passa `dirty` falso mentre il salvataggio è in corso e chiama `allowNavigation()` subito prima di navigare dopo un salvataggio riuscito. Il confronto con lo stato iniziale si fa con `useSnapshotDirty`; se i dati arrivano dal server dopo l'apertura, conta solo ciò che l'utente ha modificato. *(Le modali non hanno ancora il guard: Esc, clic sul fondo e X chiudono senza avviso.)*
 - **Verifica.** Qual è l'errore più probabile qui? È già impedito, o almeno rimediabile in un clic?
 
 ### R10 — Consistenza, convenzioni e orientamento
@@ -215,7 +215,7 @@ Copiata nel template della PR (`.github/pull_request_template.md`). Per le PR ch
 Il codice attuale non fa ancora tutto ciò che queste regole chiedono. Non sono motivo per ignorare la regola, ma per sapere cosa manca:
 
 - `Toast` non offre l'azione "Annulla" (R9).
-- Non c'è un guard standard per le modifiche non salvate (R9).
+- Il guard per le modifiche non salvate (R9) copre i form a pagina intera, non ancora le modali.
 - Molti testi esistenti usano ancora "errore/fallito" (R8): sono congelati nella baseline (vedi sotto) e si correggono quando si tocca quella schermata, non in blocco.
 - L'adesione a R4 varia tra pagine: Stays e CalendarPlanning usano già `useSearchParams`, altre no.
 - Il controllo è in gran parte manuale (checklist PR). Fa eccezione il lessico dei testi (R8): `frontend/src/locales/uiText.test.ts` blocca nei file `locales/en|it` parole come "error/failed/invalid" ("errore/fallito/non valido"), codici tipo `ERR-123` e punti esclamativi nei testi nuovi o modificati. I testi esistenti che non rispettano la regola sono congelati in `uiTextBaseline.json`, che può solo diminuire: correggi un testo, poi togli la sua riga. Un uso giusto di una di queste parole va in `allowed`, con il motivo. Il test non giudica se il messaggio è completo (cosa/perché/cosa fare): quello resta alla checklist e alla revisione.

@@ -1,8 +1,11 @@
-import { useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useMemo, Suspense, lazy } from 'react';
+import {
+  createBrowserRouter, createRoutesFromElements, RouterProvider, Outlet, Route, Navigate,
+} from 'react-router-dom';
 import { AuthLayout, MainLayout } from './layouts';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { UnsavedChangesProvider } from './components/UnsavedChangesProvider';
 import { MaterialIcon } from './components/MaterialIcon';
 import { useAuthStore } from './store';
 import { authService } from './services';
@@ -43,11 +46,98 @@ const SettingsSystem = lazy(() => import('./pages/Settings/SettingsSystem').then
 const SettingsCityTax = lazy(() => import('./pages/Settings/SettingsCityTax').then((m) => ({ default: m.SettingsCityTax })));
 const SettingsPrivacy = lazy(() => import('./pages/Settings/SettingsPrivacy').then((m) => ({ default: m.SettingsPrivacy })));
 
+function PageFallback() {
+  const { t } = useTranslation('common');
+  return (
+    <div className="flex h-full items-center justify-center bg-surface">
+      <div className="flex flex-col items-center gap-3">
+        <MaterialIcon name="progress_activity" size={40} className="text-primary animate-spin" />
+        <p className="text-on-surface-variant font-body text-sm">{t('loading')}</p>
+      </div>
+    </div>
+  );
+}
+
+function RootLayout() {
+  return (
+    <ErrorBoundary>
+      <UnsavedChangesProvider>
+        <Suspense fallback={<PageFallback />}>
+          <Outlet />
+        </Suspense>
+      </UnsavedChangesProvider>
+    </ErrorBoundary>
+  );
+}
+
+// The route tree is declared as JSX and turned into a data router (needed by useBlocker).
+const createAppRouter = () =>
+  createBrowserRouter(
+    createRoutesFromElements(
+      <Route element={<RootLayout />}>
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<Login />} />
+        </Route>
+
+        <Route element={<ProtectedRoute />}>
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/guests" element={<Guests />} />
+            <Route path="/reservations" element={<Reservations />} />
+            <Route path="/reservations/new" element={<ReservationForm />} />
+            <Route path="/reservations/:id" element={<ReservationForm />} />
+            <Route path="/reservations/edit/:id" element={<ReservationForm />} />
+            <Route path="/reservations/groups" element={<ReservationGroups />} />
+            <Route path="/reservations/groups/new" element={<ReservationGroupForm />} />
+            <Route path="/reservations/groups/:id" element={<ReservationGroupDetail />} />
+            <Route path="/quotations" element={<Quotations />} />
+            <Route path="/quotations/new" element={<QuotationForm />} />
+            <Route path="/quotations/:id" element={<QuotationDetail />} />
+            <Route path="/quotations/:id/edit" element={<QuotationForm />} />
+            <Route path="/stays" element={<Stays />} />
+            <Route path="/stays/check-in/:reservationId" element={<CheckInForm />} />
+            <Route path="/stays/walk-in" element={<WalkInCheckInForm />} />
+            <Route path="/stays/:id" element={<StayDetail />} />
+            <Route path="/billing" element={<Billing />} />
+            <Route path="/restaurant" element={<Restaurant />} />
+            <Route path="/calendar" element={<CalendarPlanning />} />
+            <Route path="/housekeeping" element={<Housekeeping />} />
+            <Route path="/rooms" element={<Rooms />} />
+            <Route path="/rates" element={<RateCalendar />} />
+            <Route path="/settings" element={<SettingsLayout />}>
+              <Route index element={<Navigate to="profile" replace />} />
+              <Route path="profile" element={<SettingsProfile />} />
+              <Route path="password" element={<SettingsPassword />} />
+              <Route path="accessibility" element={<SettingsAccessibility />} />
+              <Route path="appearance" element={<SettingsAppearance />} />
+              <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
+                <Route path="system" element={<SettingsSystem />} />
+                <Route path="city-tax" element={<SettingsCityTax />} />
+                <Route path="privacy" element={<SettingsPrivacy />} />
+              </Route>
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={NIGHT_AUDIT_ROLES} />}>
+              <Route path="/night-audit" element={<NightAudit />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
+              <Route path="/owner-dashboard" element={<OwnerDashboard />} />
+              <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/profile/hotel" element={<HotelProfile />} />
+            </Route>
+          </Route>
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>,
+    ),
+  );
+
 function App() {
   const { t } = useTranslation('common');
   const checkAuth = useAuthStore((state) => state.checkAuth);
   const isLoading = useAuthStore((state) => state.isLoading);
-
+  // Created once the session check is done, so the router reads the URL at that moment.
+  const router = useMemo(() => (isLoading ? null : createAppRouter()), [isLoading]);
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -71,76 +161,7 @@ function App() {
     );
   }
 
-  return (
-    <BrowserRouter>
-      <ErrorBoundary>
-      <Suspense fallback={
-        <div className="flex h-full items-center justify-center bg-surface">
-          <div className="flex flex-col items-center gap-3">
-            <MaterialIcon name="progress_activity" size={40} className="text-primary animate-spin" />
-            <p className="text-on-surface-variant font-body text-sm">{t('loading')}</p>
-          </div>
-        </div>
-      }>
-        <Routes>
-          <Route element={<AuthLayout />}>
-            <Route path="/login" element={<Login />} />
-          </Route>
-
-          <Route element={<ProtectedRoute />}>
-            <Route element={<MainLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/guests" element={<Guests />} />
-              <Route path="/reservations" element={<Reservations />} />
-              <Route path="/reservations/new" element={<ReservationForm />} />
-              <Route path="/reservations/:id" element={<ReservationForm />} />
-              <Route path="/reservations/edit/:id" element={<ReservationForm />} />
-              <Route path="/reservations/groups" element={<ReservationGroups />} />
-              <Route path="/reservations/groups/new" element={<ReservationGroupForm />} />
-              <Route path="/reservations/groups/:id" element={<ReservationGroupDetail />} />
-              <Route path="/quotations" element={<Quotations />} />
-              <Route path="/quotations/new" element={<QuotationForm />} />
-              <Route path="/quotations/:id" element={<QuotationDetail />} />
-              <Route path="/quotations/:id/edit" element={<QuotationForm />} />
-              <Route path="/stays" element={<Stays />} />
-              <Route path="/stays/check-in/:reservationId" element={<CheckInForm />} />
-              <Route path="/stays/walk-in" element={<WalkInCheckInForm />} />
-              <Route path="/stays/:id" element={<StayDetail />} />
-              <Route path="/billing" element={<Billing />} />
-              <Route path="/restaurant" element={<Restaurant />} />
-              <Route path="/calendar" element={<CalendarPlanning />} />
-              <Route path="/housekeeping" element={<Housekeeping />} />
-              <Route path="/rooms" element={<Rooms />} />
-              <Route path="/rates" element={<RateCalendar />} />
-              <Route path="/settings" element={<SettingsLayout />}>
-                <Route index element={<Navigate to="profile" replace />} />
-                <Route path="profile" element={<SettingsProfile />} />
-                <Route path="password" element={<SettingsPassword />} />
-                <Route path="accessibility" element={<SettingsAccessibility />} />
-                <Route path="appearance" element={<SettingsAppearance />} />
-                <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
-                  <Route path="system" element={<SettingsSystem />} />
-                  <Route path="city-tax" element={<SettingsCityTax />} />
-                  <Route path="privacy" element={<SettingsPrivacy />} />
-                </Route>
-              </Route>
-              <Route element={<ProtectedRoute allowedRoles={NIGHT_AUDIT_ROLES} />}>
-                <Route path="/night-audit" element={<NightAudit />} />
-              </Route>
-              <Route element={<ProtectedRoute allowedRoles={OWNER_ADMIN_ROLES} />}>
-                <Route path="/owner-dashboard" element={<OwnerDashboard />} />
-                <Route path="/admin/users" element={<AdminUsers />} />
-                <Route path="/profile/hotel" element={<HotelProfile />} />
-              </Route>
-            </Route>
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
-      </ErrorBoundary>
-    </BrowserRouter>
-  );
+  return router === null ? null : <RouterProvider router={router} />;
 }
 
 export default App;

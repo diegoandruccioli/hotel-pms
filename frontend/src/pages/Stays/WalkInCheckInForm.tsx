@@ -9,6 +9,7 @@ import type {
 } from '../../types';
 import type { GuestResponseDTO } from '../../types';
 import { useToastStore } from '../../store';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 import { Alert } from '../../components/Alert';
 import { PageHeader } from '../../components/PageHeader';
 import { M3Button } from '../../components/m3';
@@ -162,7 +163,13 @@ export function WalkInCheckInForm() {
 
   const handleNavigateBack = useCallback(() => navigate('/stays'), [navigate]);
 
+  // Choosing a room, a guest or a date, or editing the guest cards, is work worth keeping.
+  const [guestsEdited, setGuestsEdited] = useState(false);
+  const hasEdits = guestsEdited || selectedRoomId !== '' || selectedGuest !== null || expectedCheckOutDate !== '';
+  const { allowNavigation } = useUnsavedChangesGuard(hasEdits && !loading, t('common:unsaved_subject_walk_in'));
+
   const handleGuestChange = useCallback((index: number, patch: Partial<IdentifiableGuest>) => {
+    setGuestsEdited(true);
     setGuests(prev => {
       const updated = [...prev];
       updated[index] = { ...updated[index], ...patch };
@@ -173,8 +180,14 @@ export function WalkInCheckInForm() {
     });
   }, []);
 
-  const addGuest = useCallback(() => setGuests(prev => [...prev, emptyGuest(false)]), []);
-  const removeGuest = useCallback((index: number) => setGuests(prev => prev.filter((_, i) => i !== index)), []);
+  const addGuest = useCallback(() => {
+    setGuestsEdited(true);
+    setGuests(prev => [...prev, emptyGuest(false)]);
+  }, []);
+  const removeGuest = useCallback((index: number) => {
+    setGuestsEdited(true);
+    setGuests(prev => prev.filter((_, i) => i !== index));
+  }, []);
 
   const handleSubmit = useCallback(
     async (e: FormEvent) => {
@@ -224,6 +237,7 @@ export function WalkInCheckInForm() {
         if (created.cityTaxWarning && created.cityTaxWarning !== 'NOT_APPLICABLE') {
           addToast(t(`city_tax_post_checkin_warning_${created.cityTaxWarning.toLowerCase()}`), 'info');
         }
+        allowNavigation();
         navigate('/stays');
       } catch (err) {
         setError(getErrorMessage(err, t('err_checkin_failed')));
@@ -231,7 +245,7 @@ export function WalkInCheckInForm() {
         setLoading(false);
       }
     },
-    [selectedRoomId, selectedGuest, expectedCheckOutDate, guests, t, navigate, addToast],
+    [selectedRoomId, selectedGuest, expectedCheckOutDate, guests, t, navigate, addToast, allowNavigation],
   );
 
   const guestListLabel = useMemo(() => t('walkin_label_guest'), [t]);

@@ -9,6 +9,7 @@ import { inventoryService } from '../../services';
 import { reservationService } from '../../services';
 import { guestService } from '../../services';
 import { stayService } from '../../services';
+import { renderGuarded } from '../../test-utils/renderGuarded';
 
 import type { RoomResponse } from '../../types';
 import type { GuestResponseDTO } from '../../types';
@@ -948,5 +949,35 @@ describe('ReservationForm', () => {
     await waitForTitle('new_reservation');
     fireEvent.click(screen.getByLabelText('back'));
     expect(mockNavigate).toHaveBeenCalledWith('/reservations');
+  });
+
+  describe('unsaved changes guard', () => {
+    const renderGuardedNew = async () => {
+      const view = renderGuarded(<ReservationForm />);
+      await waitForTitle('new_reservation');
+      return view;
+    };
+
+    it('lets the user leave a new reservation they did not touch', async () => {
+      const { router } = await renderGuardedNew();
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('asks before leaving after the dates were entered, naming the reservation', async () => {
+      const { router } = await renderGuardedNew();
+      fillDates('2026-11-10', '2026-11-12');
+      fireEvent.click(screen.getByText('leave page'));
+
+      expect(router.state.location.pathname).toBe('/page');
+      expect(screen.getByText('unsaved_subject_reservation')).toBeInTheDocument();
+    });
+
+    it('does not ask when only moving between the steps', async () => {
+      const { router } = await renderGuardedNew();
+      clickNext();
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
   });
 });
