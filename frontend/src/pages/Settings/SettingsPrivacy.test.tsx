@@ -1,3 +1,4 @@
+import { createElement, Fragment, type ReactNode } from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -5,6 +6,7 @@ import { axe } from 'vitest-axe';
 import { SettingsPrivacy } from './SettingsPrivacy';
 import { guestService } from '../../services';
 import { mockAxiosErrorWithDetail } from '../../test-utils';
+import { renderGuarded } from '../../test-utils/renderGuarded';
 import type { GuestPrivacySettingsResponse } from '../../types';
 
 const stableT = (key: string, opts?: Record<string, unknown>) =>
@@ -13,6 +15,10 @@ const stableI18n = { language: 'en' };
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: stableT, i18n: stableI18n }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
+}));
+
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
 }));
 
 vi.mock('../../services/guestService');
@@ -96,6 +102,42 @@ describe('SettingsPrivacy', () => {
     await waitFor(() => expect(guestService.updatePrivacySettings)
       .toHaveBeenCalledWith({ guestRetentionYears: 7 }));
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('save', 'success'));
+  });
+
+  describe('unsaved changes guard', () => {
+    const renderGuardedPage = async () => {
+      vi.mocked(guestService.getPrivacySettings).mockResolvedValue(SETTINGS);
+      const view = renderGuarded(<SettingsPrivacy />);
+      await waitFor(() => expect(screen.getByDisplayValue('5')).toBeInTheDocument());
+      return view;
+    };
+
+    it('lets the user leave while the value is untouched', async () => {
+      const { router } = await renderGuardedPage();
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('asks before leaving once the retention period was changed, naming it', async () => {
+      const { router } = await renderGuardedPage();
+      fireEvent.change(screen.getByDisplayValue('5'), { target: { value: '8' } });
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/page');
+      expect(screen.getByText('common:unsaved_subject_privacy')).toBeInTheDocument();
+    });
+
+    it('does not ask once the change was put back, or after a successful save', async () => {
+      vi.mocked(guestService.updatePrivacySettings).mockResolvedValue({ ...SETTINGS, guestRetentionYears: 8 });
+      const { router } = await renderGuardedPage();
+      const years = screen.getByDisplayValue('5');
+      fireEvent.change(years, { target: { value: '8' } });
+      fireEvent.click(screen.getByRole('button', { name: 'save' }));
+      await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('save', 'success'));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'save' })).toBeEnabled());
+
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
   });
 
   it('should have no accessibility violations', async () => {

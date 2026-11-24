@@ -39,6 +39,34 @@ describe('RoomTypeFormModal', () => {
 
   beforeEach(() => vi.clearAllMocks());
 
+  describe('unsaved changes guard', () => {
+    it('closes at once when nothing was changed', () => {
+      render(<RoomTypeFormModal roomType={ROOM_TYPE} onClose={onClose} onSaved={onSaved} />);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks before closing once a name was typed, naming the room type', () => {
+      render(<RoomTypeFormModal onClose={onClose} onSaved={onSaved} />);
+      fireEvent.change(screen.getByLabelText(/^name/i), { target: { value: 'Suite' } });
+      fireEvent.click(screen.getByText('cancel'));
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('common:unsaved_subject_room_type')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'unsaved_leave' }));
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('does not ask when an edit is put back to the saved value', () => {
+      render(<RoomTypeFormModal roomType={ROOM_TYPE} onClose={onClose} onSaved={onSaved} />);
+      const name = screen.getByLabelText(/^name/i);
+      fireEvent.change(name, { target: { value: 'Double' } });
+      fireEvent.change(name, { target: { value: 'Single' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
+
   it('renders add room type heading when no roomType prop', () => {
     render(<RoomTypeFormModal onClose={onClose} onSaved={onSaved} />);
     expect(screen.getByText('add_room_type')).toBeInTheDocument();

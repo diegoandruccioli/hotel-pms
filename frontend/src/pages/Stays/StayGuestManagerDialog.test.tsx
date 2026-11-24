@@ -253,6 +253,52 @@ describe('StayGuestManagerDialog', () => {
     ));
   });
 
+  describe('unsaved changes guard', () => {
+    const openAddForm = async (onClose = vi.fn()) => {
+      vi.mocked(stayService.getStayById).mockResolvedValue(stayWith([primaryGuest]));
+      render(<StayGuestManagerDialog stayId={STAY_ID} onClose={onClose} />);
+      await waitFor(() => expect(screen.getByText('Rossi Mario')).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: 'btn_add_guest' }));
+      await screen.findByText('guest_number:{"number":1}');
+      return onClose;
+    };
+
+    it('closes at once from the guest list', async () => {
+      vi.mocked(stayService.getStayById).mockResolvedValue(stayWith([primaryGuest]));
+      const onClose = vi.fn();
+      render(<StayGuestManagerDialog stayId={STAY_ID} onClose={onClose} />);
+      await waitFor(() => expect(screen.getByText('Rossi Mario')).toBeInTheDocument());
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('closes at once from an untouched add form', async () => {
+      const onClose = await openAddForm();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks before closing once a guest detail was typed, naming the stay guest', async () => {
+      const onClose = await openAddForm();
+      fireEvent.change(screen.getByLabelText(/label_first_name/), { target: { value: 'Luca' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('common:unsaved_subject_stay_guest')).toBeInTheDocument();
+    });
+
+    it('asks before cancelling the form with typed data, and goes back to the list on "leave"', async () => {
+      const onClose = await openAddForm();
+      fireEvent.change(screen.getByLabelText(/label_first_name/), { target: { value: 'Luca' } });
+      fireEvent.click(screen.getByRole('button', { name: 'btn_cancel' }));
+
+      expect(screen.getByText('unsaved_title')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'unsaved_leave' }));
+      expect(screen.getByRole('button', { name: 'btn_add_guest' })).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
   it('adds a new guest via the reused GuestFieldSection form', async () => {
     vi.mocked(stayService.getStayById)
       .mockResolvedValueOnce(stayWith([primaryGuest]))

@@ -8,6 +8,8 @@ import { M3Dialog } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { M3Textarea } from '../../components/m3';
 import { useToastStore } from '../../store';
+import { useSnapshotDirty } from '../../hooks/useSnapshotDirty';
+import { useDiscardGuard } from '../../hooks/useDiscardGuard';
 
 interface Props {
   roomType?: RoomTypeResponse;
@@ -27,6 +29,11 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
     basePrice: roomType?.basePrice || 50.0,
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const { dirty } = useSnapshotDirty(JSON.stringify(formData), true);
+  const { requestClose, discardDialog } = useDiscardGuard(
+    dirty && !loading, t('common:unsaved_subject_room_type'), onClose,
+  );
 
   const roomTypeSchema = useMemo(() => z.object({
     name: z.string().trim()
@@ -123,18 +130,19 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
         )}
       </div>
       <div className="flex gap-2">
-        <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
+        <M3Button variant="text" onClick={requestClose} disabled={loading}>{t('cancel')}</M3Button>
         <M3Button form="room-type-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
       </div>
     </div>
   );
 
   return (
+    <>
     <M3Dialog
       open
       title={roomType ? t('edit_room_type') : t('add_room_type')}
       titleId="room-type-modal-title"
-      onClose={onClose}
+      onClose={requestClose}
       footer={footer}
     >
       <form id="room-type-form" onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -180,6 +188,8 @@ export const RoomTypeFormModal = memo(({ roomType, onClose, onSaved }: Props) =>
         </div>
       </form>
     </M3Dialog>
+    {discardDialog}
+    </>
   );
 });
 

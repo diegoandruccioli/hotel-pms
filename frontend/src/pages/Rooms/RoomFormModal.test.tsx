@@ -41,6 +41,34 @@ describe('RoomFormModal', () => {
 
   beforeEach(() => vi.clearAllMocks());
 
+  describe('unsaved changes guard', () => {
+    it('closes at once when nothing was changed', () => {
+      render(<RoomFormModal room={ROOM} roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks before closing a new room once a number was typed, naming the room', () => {
+      render(<RoomFormModal roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+      fireEvent.change(screen.getByLabelText(/room_number/i), { target: { value: '305' } });
+      fireEvent.click(screen.getByText('cancel'));
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('common:unsaved_subject_room')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'unsaved_leave' }));
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('does not ask when an edit is put back to the saved value', () => {
+      render(<RoomFormModal room={ROOM} roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
+      const number = screen.getByLabelText(/room_number/i);
+      fireEvent.change(number, { target: { value: '999' } });
+      fireEvent.change(number, { target: { value: '101' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
+
   it('renders add room heading when no room prop', () => {
     render(<RoomFormModal roomTypes={ROOM_TYPES} onClose={onClose} onSaved={onSaved} />);
     expect(screen.getByText('rooms_new_room')).toBeInTheDocument();

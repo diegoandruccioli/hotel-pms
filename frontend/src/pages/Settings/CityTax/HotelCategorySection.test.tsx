@@ -1,9 +1,15 @@
+import { createElement, Fragment, type ReactNode } from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { axe } from 'vitest-axe';
 import { HotelCategorySection } from './HotelCategorySection';
 import { stayService } from '../../../services';
+import { renderGuarded } from '../../../test-utils/renderGuarded';
 import type { HotelCategoryHistoryResponse } from '../../../types';
+
+vi.mock('focus-trap-react', () => ({
+  default: ({ children }: { children: ReactNode }) => createElement(Fragment, null, children),
+}));
 
 const stableT = (key: string) => key;
 const stableI18n = { language: 'en' };
@@ -57,6 +63,41 @@ describe('HotelCategorySection', () => {
     render(<HotelCategorySection />);
     await waitFor(() => expect(screen.getByText('city_tax_current_category')).toBeInTheDocument());
     expect(screen.getByText('4_STAR')).toBeInTheDocument();
+  });
+
+  describe('unsaved changes guard', () => {
+    const renderGuardedSection = async () => {
+      const view = renderGuarded(<HotelCategorySection />);
+      await waitFor(() => expect(screen.getByText('city_tax_no_category_history')).toBeInTheDocument());
+      return view;
+    };
+
+    it('lets the user leave while the form is empty', async () => {
+      const { router } = await renderGuardedSection();
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
+
+    it('asks before leaving with a half-filled category, naming it', async () => {
+      const { router } = await renderGuardedSection();
+      fireEvent.change(screen.getByLabelText(/city_tax_category \*/i), { target: { value: '4_STAR' } });
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/page');
+      expect(screen.getByText('common:unsaved_subject_hotel_category')).toBeInTheDocument();
+    });
+
+    it('does not ask once the category has been recorded', async () => {
+      vi.mocked(stayService.recordHotelCategory).mockResolvedValue(CATEGORY_ENTRY);
+      const { router } = await renderGuardedSection();
+      fireEvent.change(screen.getByLabelText(/city_tax_category \*/i), { target: { value: '4_STAR' } });
+      fireEvent.change(screen.getByLabelText(/city_tax_valid_from \*/i), { target: { value: '2026-06-01' } });
+      fireEvent.click(screen.getByText('city_tax_add_category'));
+      await waitFor(() => expect(stayService.recordHotelCategory).toHaveBeenCalled());
+      await waitFor(() => expect(screen.getByLabelText(/city_tax_category \*/i)).toHaveValue(''));
+
+      fireEvent.click(screen.getByText('leave page'));
+      expect(router.state.location.pathname).toBe('/elsewhere');
+    });
   });
 
   it('submits a new category entry and reloads the history', async () => {

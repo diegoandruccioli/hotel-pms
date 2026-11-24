@@ -10,6 +10,8 @@ import { M3TextField } from './m3';
 import { M3Select } from './m3';
 import { StructuredAddressFields } from './StructuredAddressFields';
 import { useToastStore } from '../store';
+import { useSnapshotDirty } from '../hooks/useSnapshotDirty';
+import { useDiscardGuard } from '../hooks/useDiscardGuard';
 
 const COUNTRY_CODES = [
   { code: '+39', label: '🇮🇹 +39' },
@@ -120,6 +122,14 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
     setPhoneNumber(formatPhoneDisplay(e.target.value));
   }, [formatPhoneDisplay]);
 
+  // The form as opened (the saved guest, or empty) against what is on screen now.
+  const { dirty } = useSnapshotDirty(JSON.stringify([formData, phonePrefix, phoneNumber]), true);
+  const { requestClose, discardDialog } = useDiscardGuard(
+    dirty && !loading,
+    t(guest ? 'common:unsaved_subject_guest_edit' : 'common:unsaved_subject_guest_new'),
+    onClose,
+  );
+
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     setFieldErrors({});
@@ -215,18 +225,19 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
         )}
       </div>
       <div className="flex gap-2">
-        <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
+        <M3Button variant="text" onClick={requestClose} disabled={loading}>{t('cancel')}</M3Button>
         <M3Button form="guest-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
       </div>
     </div>
   );
 
   return (
+    <>
     <M3Dialog
       open
       title={guest ? t('edit_guest') : t('add_guest')}
       titleId="guest-modal-title"
-      onClose={onClose}
+      onClose={requestClose}
       footer={footer}
     >
             <form id="guest-form" onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -324,6 +335,8 @@ export const GuestFormModal = memo(({ guest, onClose, onSaved }: Props) => {
               </div>
             </form>
     </M3Dialog>
+    {discardDialog}
+    </>
   );
 });
 

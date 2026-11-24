@@ -44,6 +44,73 @@ describe('GuestFormModal', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 
+  describe('unsaved changes guard', () => {
+    it('asks before closing a new guest with Escape once something was typed', () => {
+      const onClose = vi.fn();
+      render(<GuestFormModal onClose={onClose} onSaved={vi.fn()} />);
+      fireEvent.change(screen.getByLabelText(/label_first_name/i), { target: { value: 'Mario' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('unsaved_title')).toBeInTheDocument();
+      expect(screen.getByText('common:unsaved_subject_guest_new')).toBeInTheDocument();
+    });
+
+    it('asks before closing with the Cancel button and the header close button', () => {
+      const onClose = vi.fn();
+      render(<GuestFormModal onClose={onClose} onSaved={vi.fn()} />);
+      fireEvent.change(screen.getByLabelText(/label_last_name/i), { target: { value: 'Rossi' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
+      expect(screen.getByText('unsaved_title')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'unsaved_keep_editing' }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'close' }));
+      expect(screen.getByText('unsaved_title')).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('closes after "leave without saving"', () => {
+      const onClose = vi.fn();
+      render(<GuestFormModal onClose={onClose} onSaved={vi.fn()} />);
+      fireEvent.change(screen.getByLabelText(/label_first_name/i), { target: { value: 'Mario' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      fireEvent.click(screen.getByRole('button', { name: 'unsaved_leave' }));
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('does not ask when the edit is put back to the saved value', () => {
+      const onClose = vi.fn();
+      render(<GuestFormModal guest={GUEST_WITH_FISCAL} onClose={onClose} onSaved={vi.fn()} />);
+      const first = screen.getByLabelText(/label_first_name/i);
+      fireEvent.change(first, { target: { value: 'Luigi' } });
+      fireEvent.change(first, { target: { value: 'Mario' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('names the existing guest when editing', () => {
+      render(<GuestFormModal guest={GUEST_WITH_FISCAL} onClose={vi.fn()} onSaved={vi.fn()} />);
+      fireEvent.change(screen.getByLabelText(/label_first_name/i), { target: { value: 'Luigi' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.getByText('common:unsaved_subject_guest_edit')).toBeInTheDocument();
+    });
+
+    it('closes without asking after a successful save', async () => {
+      vi.mocked(guestService.createGuest).mockResolvedValue({ id: 'g9' } as never);
+      const onSaved = vi.fn();
+      const onClose = vi.fn();
+      render(<GuestFormModal onClose={onClose} onSaved={onSaved} />);
+      fireEvent.change(screen.getByLabelText(/label_first_name/i), { target: { value: 'Mario' } });
+      fireEvent.change(screen.getByLabelText(/label_last_name/i), { target: { value: 'Rossi' } });
+      fireEvent.change(screen.getByLabelText(/label_email_hint/i), { target: { value: 'mario@test.com' } });
+      fireEvent.submit(document.getElementById('guest-form') as HTMLFormElement);
+
+      await waitFor(() => expect(onSaved).toHaveBeenCalled());
+      expect(screen.queryByText('unsaved_title')).not.toBeInTheDocument();
+    });
+  });
+
   it('takes the phone placeholder from the translations, not from a literal', () => {
     render(<GuestFormModal onClose={vi.fn()} onSaved={vi.fn()} />);
     expect(screen.getByLabelText('label_phone_number')).toHaveAttribute('placeholder', 'placeholder_phone_number');

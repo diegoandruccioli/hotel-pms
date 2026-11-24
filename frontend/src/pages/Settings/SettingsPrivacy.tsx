@@ -10,6 +10,7 @@ import { M3TextField } from '../../components/m3';
 import { SettingsSectionTitle } from '../../components/SettingsSectionTitle';
 import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
 // -----------------------------------------------------------------------
 // SettingsPrivacy page — GDPR retention settings (T-GST-05). The backend
@@ -29,6 +30,10 @@ export const SettingsPrivacy = () => {
   const [retentionYears, setRetentionYears] = useState('');
   const [fieldError, setFieldError] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Against the value last loaded or saved.
+  const dirty = settings !== null && !saving && retentionYears !== String(settings.guestRetentionYears);
+  useUnsavedChangesGuard(dirty, t('common:unsaved_subject_privacy'));
 
   const loadSettings = useCallback(async () => {
     try {

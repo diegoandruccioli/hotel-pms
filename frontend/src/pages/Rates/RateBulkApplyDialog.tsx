@@ -9,6 +9,8 @@ import { M3TextField } from '../../components/m3';
 import { M3Checkbox } from '../../components/m3';
 import { useToastStore } from '../../store';
 import { getErrorMessage } from '../../utils';
+import { useSnapshotDirty } from '../../hooks/useSnapshotDirty';
+import { useDiscardGuard } from '../../hooks/useDiscardGuard';
 
 interface RoomTypeOption {
   id: string;
@@ -54,6 +56,10 @@ export const RateBulkApplyDialog = memo(({
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // Against what the dialog opened with (a prefilled selection counts as the starting point).
+  const { dirty } = useSnapshotDirty(JSON.stringify([selectedIds, startDate, endDate, nightlyPrice, name]), true);
+  const { requestClose, discardDialog } = useDiscardGuard(dirty && !saving, t('unsaved_subject_rate_bulk'), onClose);
 
   const schema = useMemo(() => z.object({
     roomTypeIds: z.array(z.string()).min(1, t('err_select_room_type')),
@@ -125,17 +131,18 @@ export const RateBulkApplyDialog = memo(({
 
   const footer = (
     <div className="flex justify-end gap-2">
-      <M3Button variant="text" onClick={onClose} disabled={saving}>{t('cancel')}</M3Button>
+      <M3Button variant="text" onClick={requestClose} disabled={saving}>{t('cancel')}</M3Button>
       <M3Button form="rate-bulk-apply-form" type="submit" loading={saving} disabled={saving}>{t('save')}</M3Button>
     </div>
   );
 
   return (
+    <>
     <M3Dialog
       open
       title={t('apply_price_dialog_title')}
       titleId="rate-bulk-apply-title"
-      onClose={onClose}
+      onClose={requestClose}
       footer={footer}
     >
       <form id="rate-bulk-apply-form" onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -192,6 +199,8 @@ export const RateBulkApplyDialog = memo(({
         />
       </form>
     </M3Dialog>
+    {discardDialog}
+    </>
   );
 });
 

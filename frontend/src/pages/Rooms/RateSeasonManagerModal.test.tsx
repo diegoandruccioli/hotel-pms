@@ -94,6 +94,63 @@ describe('RateSeasonManagerModal', () => {
     await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('rate_season_saved', 'success'));
   });
 
+  describe('unsaved changes guard', () => {
+    const openAddForm = async () => {
+      vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([]);
+      render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+      await waitFor(() => expect(screen.getByText('add_rate_season')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('add_rate_season'));
+    };
+
+    it('closes at once from the list, where there is nothing to lose', async () => {
+      vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([]);
+      render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+      await waitFor(() => expect(screen.getByText('add_rate_season')).toBeInTheDocument());
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('closes at once from an untouched form', async () => {
+      await openAddForm();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks before closing an edited form, naming the season', async () => {
+      await openAddForm();
+      fireEvent.change(screen.getByLabelText(/rate_season_nightly_price/i), { target: { value: '150' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('common:unsaved_subject_rate_season')).toBeInTheDocument();
+    });
+
+    it('asks before going back to the list with an edited form, and goes back on "leave"', async () => {
+      await openAddForm();
+      fireEvent.change(screen.getByLabelText(/rate_season_start_date/i), { target: { value: '2026-08-01' } });
+      fireEvent.click(screen.getByText('cancel'));
+
+      expect(screen.getByText('unsaved_title')).toBeInTheDocument();
+      expect(screen.queryByLabelText(/rate_season_start_date/i)).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'unsaved_leave' }));
+      expect(screen.getByText('add_rate_season')).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('does not ask for an edit put back to the saved season', async () => {
+      vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
+      render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+      await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: /row_actions_for/ }));
+      fireEvent.click(screen.getByRole('menuitem', { name: /edit/i }));
+      const price = screen.getByLabelText(/rate_season_nightly_price/i);
+      fireEvent.change(price, { target: { value: '200' } });
+      fireEvent.change(price, { target: { value: '150' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
+
   it('add_rate_season opens the form', async () => {
     vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([]);
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
