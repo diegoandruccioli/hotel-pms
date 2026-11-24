@@ -16,6 +16,10 @@ import { defineConfig, devices } from '@playwright/test';
 //     postgres/redis/config-server/auth/frontdesk/billing/guest/gateway/frontend —
 //     none of these are profile-gated)
 //   cd frontend && npm run test:e2e:live
+//
+// PLAYWRIGHT_LIVE_BASE_URL must be http://localhost (the stack's nginx) or http://localhost:5173 (the vite
+// dev server). The gateway only allows the 5173 origin (GW_CORS_ALLOWED_ORIGINS), so any other port gets a
+// 403 on every POST/PUT/DELETE while the GETs still work: the run looks half broken, not misconfigured.
 
 const baseURL = process.env.PLAYWRIGHT_LIVE_BASE_URL ?? 'http://localhost';
 const STORAGE_STATE = 'e2e-live/.auth/admin.json';
