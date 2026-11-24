@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { renderWithQuery as render } from '../../test-utils';
 import { StayGuestManagerDialog } from './StayGuestManagerDialog';
 import { stayService } from '../../services';
@@ -102,6 +102,30 @@ describe('StayGuestManagerDialog', () => {
   it('renders nothing when stayId is null', () => {
     const { container } = render(<StayGuestManagerDialog stayId={null} onClose={vi.fn()} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('shows a retry state instead of an empty guest list when the stay cannot be loaded', async () => {
+    vi.mocked(stayService.getStayById).mockRejectedValue(new Error('boom'));
+
+    render(<StayGuestManagerDialog stayId={STAY_ID} onClose={vi.fn()} />);
+
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('guests_load_title')).toBeInTheDocument();
+    expect(within(alert).getByText('guests_load_hint')).toBeInTheDocument();
+    expect(screen.queryByText('btn_add_guest')).not.toBeInTheDocument();
+    expect(addToastMock).not.toHaveBeenCalled();
+  });
+
+  it('reloads the guests on "try again"', async () => {
+    vi.mocked(stayService.getStayById)
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(stayWith([primaryGuest, secondaryGuest]));
+
+    render(<StayGuestManagerDialog stayId={STAY_ID} onClose={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'common:try_again' }));
+    await waitFor(() => expect(screen.getByText('Verdi Anna')).toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('lists guests with primary/sent/needs-resubmit badges', async () => {

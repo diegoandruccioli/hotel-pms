@@ -283,10 +283,32 @@ describe('AdminUsers', () => {
     expect(await axe(container)).toHaveNoViolations();
   }, 30000);
 
-  it('shows an error toast when listUsers fails', async () => {
+  it('shows a retry state, not "no users", when the list cannot be loaded', async () => {
     vi.mocked(userService.listUsers).mockRejectedValue(new Error('boom'));
     renderAdminUsers();
-    await waitFor(() => expect(mockAddToast).toHaveBeenCalledWith('err_load_failed', 'error'));
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('users_load_title')).toBeInTheDocument();
+    expect(within(alert).getByText('users_load_hint')).toBeInTheDocument();
+    expect(screen.queryByText('no_users')).not.toBeInTheDocument();
+    expect(mockAddToast).not.toHaveBeenCalled();
+  });
+
+  it('shows the backend detail in the load failure state', async () => {
+    vi.mocked(userService.listUsers).mockRejectedValue(mockAxiosErrorWithDetail('Servizio non raggiungibile'));
+    renderAdminUsers();
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('Servizio non raggiungibile')).toBeInTheDocument();
+  });
+
+  it('reloads the list on "try again"', async () => {
+    vi.mocked(userService.listUsers)
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce([USER_ACTIVE]);
+    renderAdminUsers();
+    fireEvent.click(await screen.findByRole('button', { name: 'try_again' }));
+    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument());
+    expect(userService.listUsers).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('shows the no_users message when the list is empty', async () => {

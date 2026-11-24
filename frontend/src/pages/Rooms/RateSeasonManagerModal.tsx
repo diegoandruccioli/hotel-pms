@@ -7,6 +7,7 @@ import { rateSeasonService } from '../../services';
 import type { RateSeasonRequest, RateSeasonResponse, RoomTypeResponse } from '../../types';
 import { M3LoadingState } from '../../components/m3';
 import { M3EmptyState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3ConfirmDialog } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
@@ -14,6 +15,7 @@ import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { M3RowActionsMenu, type RowAction } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { useToastStore } from '../../store';
+import { getErrorMessage } from '../../utils';
 import { useDiscardGuard } from '../../hooks/useDiscardGuard';
 
 interface Props {
@@ -60,6 +62,7 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
 
   const [seasons, setSeasons] = useState<RateSeasonResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [mode, setMode] = useState<'list' | 'form'>('list');
   const [editingSeason, setEditingSeason] = useState<RateSeasonResponse | undefined>();
@@ -70,15 +73,15 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
   const loadSeasons = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await rateSeasonService.listSeasons(roomType.id);
       setSeasons(data);
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } }, message?: string };
-      addToast(e.response?.data?.detail || e.message || t('error_loading_rate_seasons'), 'error');
+      setLoadError(getErrorMessage(err, t('rate_seasons_load_hint')));
     } finally {
       setLoading(false);
     }
-  }, [roomType.id, addToast, t]);
+  }, [roomType.id, t]);
 
   useEffect(() => {
     loadSeasons();
@@ -216,12 +219,21 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
     >
       {mode === 'list' ? (
         <div className="space-y-4">
-          <div className="flex justify-end">
-            <M3Button icon="add" onClick={openAddForm}>{t('add_rate_season')}</M3Button>
-          </div>
+          {loadError === null && (
+            <div className="flex justify-end">
+              <M3Button icon="add" onClick={openAddForm}>{t('add_rate_season')}</M3Button>
+            </div>
+          )}
 
           {loading ? (
             <M3LoadingState label={t('common:loading')} plain className="h-32" />
+          ) : loadError !== null ? (
+            <M3ErrorState
+              title={t('rate_seasons_load_title')}
+              message={loadError}
+              retryLabel={t('common:try_again')}
+              onRetry={loadSeasons}
+            />
           ) : seasons.length === 0 ? (
             <M3EmptyState icon="date_range" title={t('no_rate_seasons')} className="py-6" />
           ) : (

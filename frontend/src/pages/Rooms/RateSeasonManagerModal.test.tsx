@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { RateSeasonManagerModal } from './RateSeasonManagerModal';
 import { rateSeasonService } from '../../services';
-import { openRowMenu } from '../../test-utils';
+import { mockAxiosErrorWithDetail, openRowMenu } from '../../test-utils';
 import { formatDate } from '../../utils';
 
 // Stable reference: a fresh `t` on every render re-fires the component's load effect,
@@ -64,6 +64,42 @@ describe('RateSeasonManagerModal', () => {
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     await waitFor(() => expect(screen.getByText('no_rate_seasons')).toBeInTheDocument());
   });
+
+  it('shows a retry state, not the empty message, when the seasons cannot be loaded', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockRejectedValue(new Error('boom'));
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText('rate_seasons_load_title')).toBeInTheDocument();
+    expect(within(alert).getByText('rate_seasons_load_hint')).toBeInTheDocument();
+    expect(screen.queryByText('no_rate_seasons')).not.toBeInTheDocument();
+    expect(screen.queryByText('add_rate_season')).not.toBeInTheDocument();
+    expect(screen.getAllByText('close').length).toBeGreaterThan(0);
+    expect(mockAddToast).not.toHaveBeenCalled();
+  });
+
+  it('shows the backend detail in the load failure state', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockRejectedValue(mockAxiosErrorWithDetail('Servizio non raggiungibile'));
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    expect(await screen.findByText('Servizio non raggiungibile')).toBeInTheDocument();
+  });
+
+  it('reloads the seasons on "try again" and brings back the add button', async () => {
+    vi.mocked(rateSeasonService.listSeasons)
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce([SEASON]);
+    render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'common:try_again' }));
+    await waitFor(() => expect(screen.getByText('High season')).toBeInTheDocument());
+    expect(screen.getByText('add_rate_season')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('has no axe violations in the load failure state', async () => {
+    vi.mocked(rateSeasonService.listSeasons).mockRejectedValue(new Error('boom'));
+    const { baseElement } = render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
+    await screen.findByRole('alert');
+    expect(await axe(baseElement)).toHaveNoViolations();
+  }, 30000);
 
   it('renders a season row after data loads', async () => {
     vi.mocked(rateSeasonService.listSeasons).mockResolvedValue([SEASON]);
