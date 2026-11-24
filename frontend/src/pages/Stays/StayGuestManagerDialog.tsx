@@ -15,6 +15,7 @@ import { GuestFieldSection } from './GuestFieldSection';
 import { StayGuestRow } from './StayGuestRow';
 import { emptyGuest, toIdentifiableGuest, toRequest, validateSingleGuest } from './stayGuestFieldHelpers';
 import type { IdentifiableGuest } from './stayGuestFieldHelpers';
+import { useDiscardGuard } from '../../hooks/useDiscardGuard';
 
 const EMPTY_STATI: AlloggiatiStato[] = [];
 const EMPTY_TIPDOC: AlloggiatiTipdoc[] = [];
@@ -66,23 +67,38 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
     onClose();
   }, [onClose, queryClient]);
 
+  // The guest form as it was opened (empty, or the guest being edited), to tell what was typed since.
+  const [formBaseline, setFormBaseline] = useState<string | null>(null);
+
   const handleOpenAdd = useCallback(() => {
-    setFormGuest(emptyGuest(false));
+    const guest = emptyGuest(false);
+    setFormGuest(guest);
+    setFormBaseline(JSON.stringify(guest));
     setEditingId(null);
     setFormError(null);
   }, []);
 
   const handleOpenEdit = useCallback((guest: StayGuestResponse) => {
-    setFormGuest(toIdentifiableGuest(guest, stati));
+    const form = toIdentifiableGuest(guest, stati);
+    setFormGuest(form);
+    setFormBaseline(JSON.stringify(form));
     setEditingId(guest.id);
     setFormError(null);
   }, [stati]);
 
   const handleCancelForm = useCallback(() => {
     setFormGuest(null);
+    setFormBaseline(null);
     setEditingId(null);
     setFormError(null);
   }, []);
+
+  const formDirty = formGuest !== null && !saving && JSON.stringify(formGuest) !== formBaseline;
+  const subject = t('common:unsaved_subject_stay_guest');
+  const { requestClose, discardDialog } = useDiscardGuard(formDirty, subject, closeAndReset);
+  const { requestClose: requestCancelForm, discardDialog: discardFormDialog } = useDiscardGuard(
+    formDirty, subject, handleCancelForm,
+  );
 
   const handleFormChange = useCallback((_idx: number, patch: Partial<IdentifiableGuest>) => {
     setFormGuest((prev) => (prev ? { ...prev, ...patch } : prev));
@@ -187,11 +203,12 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
   const guests = stay?.guests ?? [];
 
   return (
+    <>
     <M3Dialog
       open={!!stayId}
       title={t('guest_manager_title', { room: stay?.roomNumber ?? '' })}
       titleId="stay-guest-manager-title"
-      onClose={closeAndReset}
+      onClose={requestClose}
     >
       {loading ? (
         <M3LoadingState label={t('loading')} />
@@ -228,7 +245,7 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
               />
               {formError && <p className="text-sm text-error">{formError}</p>}
               <div className="flex justify-end gap-2">
-                <M3Button variant="text" onClick={handleCancelForm} type="button">
+                <M3Button variant="text" onClick={requestCancelForm} type="button">
                   {t('btn_cancel')}
                 </M3Button>
                 <M3Button onClick={handleSaveForm} loading={saving} disabled={saving} type="button">
@@ -257,6 +274,9 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
         />
       )}
     </M3Dialog>
+    {discardDialog}
+    {discardFormDialog}
+    </>
   );
 });
 StayGuestManagerDialog.displayName = 'StayGuestManagerDialog';

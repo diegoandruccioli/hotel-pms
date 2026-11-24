@@ -14,6 +14,7 @@ import { M3Table, M3TableRow, M3TableCell } from '../../components/m3';
 import { M3RowActionsMenu, type RowAction } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { useToastStore } from '../../store';
+import { useDiscardGuard } from '../../hooks/useDiscardGuard';
 
 interface Props {
   roomType: RoomTypeResponse;
@@ -114,6 +115,15 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
 
   const backToList = useCallback(() => setMode('list'), []);
 
+  // Only the form holds anything to lose: what is typed against the season it opened with.
+  const formStart = useMemo(() => (editingSeason
+    ? { name: editingSeason.name || '', startDate: editingSeason.startDate, endDate: editingSeason.endDate, nightlyPrice: editingSeason.nightlyPrice }
+    : EMPTY_FORM), [editingSeason]);
+  const dirty = mode === 'form' && !saving && JSON.stringify(formData) !== JSON.stringify(formStart);
+  const subject = t('common:unsaved_subject_rate_season');
+  const { requestClose, discardDialog } = useDiscardGuard(dirty, subject, onClose);
+  const { requestClose: requestBack, discardDialog: discardBackDialog } = useDiscardGuard(dirty, subject, backToList);
+
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: name === 'nightlyPrice' ? Number(value) : value }));
@@ -184,23 +194,24 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
 
   const listFooter = (
     <div className="flex justify-end">
-      <M3Button variant="text" onClick={onClose}>{t('close')}</M3Button>
+      <M3Button variant="text" onClick={requestClose}>{t('close')}</M3Button>
     </div>
   );
 
   const formFooter = (
     <div className="flex justify-end gap-2">
-      <M3Button variant="text" onClick={backToList} disabled={saving}>{t('cancel')}</M3Button>
+      <M3Button variant="text" onClick={requestBack} disabled={saving}>{t('cancel')}</M3Button>
       <M3Button form="rate-season-form" type="submit" loading={saving} disabled={saving}>{t('save')}</M3Button>
     </div>
   );
 
   return (
+    <>
     <M3Dialog
       open
       title={t('rate_seasons_title', { roomType: roomType.name })}
       titleId="rate-season-modal-title"
-      onClose={onClose}
+      onClose={requestClose}
       footer={mode === 'list' ? listFooter : formFooter}
     >
       {mode === 'list' ? (
@@ -279,6 +290,9 @@ export const RateSeasonManagerModal = memo(({ roomType, onClose }: Props) => {
         </form>
       )}
     </M3Dialog>
+    {discardDialog}
+    {discardBackDialog}
+    </>
   );
 });
 

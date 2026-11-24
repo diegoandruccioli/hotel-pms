@@ -8,6 +8,8 @@ import { M3Dialog } from '../../components/m3';
 import { M3Select } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { useToastStore } from '../../store';
+import { useSnapshotDirty } from '../../hooks/useSnapshotDirty';
+import { useDiscardGuard } from '../../hooks/useDiscardGuard';
 
 interface Props {
   room?: RoomResponse;
@@ -28,6 +30,9 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
     hotelId: room?.hotelId || '',
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const { dirty } = useSnapshotDirty(JSON.stringify(formData), true);
+  const { requestClose, discardDialog } = useDiscardGuard(dirty && !loading, t('common:unsaved_subject_room'), onClose);
 
   const roomSchema = useMemo(() => z.object({
     roomNumber: z.string().trim()
@@ -127,18 +132,19 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
         )}
       </div>
       <div className="flex gap-2">
-        <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
+        <M3Button variant="text" onClick={requestClose} disabled={loading}>{t('cancel')}</M3Button>
         <M3Button form="room-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
       </div>
     </div>
   );
 
   return (
+    <>
     <M3Dialog
       open
       title={room ? t('edit_room') : t('rooms_new_room')}
       titleId="room-modal-title"
-      onClose={onClose}
+      onClose={requestClose}
       footer={footer}
     >
       <form id="room-form" onSubmit={handleSubmit} noValidate className="space-y-4">
@@ -176,6 +182,8 @@ export const RoomFormModal = memo(({ room, roomTypes, onClose, onSaved }: Props)
 
       </form>
     </M3Dialog>
+    {discardDialog}
+    </>
   );
 });
 

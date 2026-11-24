@@ -42,6 +42,36 @@ describe('RateBulkApplyDialog', () => {
     expect(screen.getByText('Suite')).toBeInTheDocument();
   });
 
+  describe('unsaved changes guard', () => {
+    it('closes at once when nothing was changed from what the dialog opened with', () => {
+      render(
+        <RateBulkApplyDialog roomTypes={ROOM_TYPES} initialRoomTypeIds={PREFILLED_ROOM_TYPE_IDS}
+          initialStartDate="2026-08-01" initialEndDate="2026-08-10" onClose={onClose} onApplied={onApplied} />,
+      );
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks before closing once the price was typed, naming what will not be applied', () => {
+      render(<RateBulkApplyDialog roomTypes={ROOM_TYPES} onClose={onClose} onApplied={onApplied} />);
+      fireEvent.change(screen.getByLabelText(/rate_season_nightly_price/i), { target: { value: '120' } });
+      fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('unsaved_subject_rate_bulk')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'unsaved_leave' }));
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks after ticking another room type', () => {
+      render(<RateBulkApplyDialog roomTypes={ROOM_TYPES} onClose={onClose} onApplied={onApplied} />);
+      fireEvent.click(screen.getByLabelText('Suite'));
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('unsaved_title')).toBeInTheDocument();
+    });
+  });
+
   it('pre-fills room types and dates from the selection', () => {
     render(
       <RateBulkApplyDialog

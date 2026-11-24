@@ -49,6 +49,42 @@ describe('MenuFormModal', () => {
     expect(screen.getByLabelText(/menu_category/)).toHaveValue('');
   });
 
+  describe('unsaved changes guard', () => {
+    it('closes at once when nothing was typed', () => {
+      render(<MenuFormModal onClose={onClose} onSaved={onSaved} />);
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks before closing a new item once a name was typed', () => {
+      render(<MenuFormModal onClose={onClose} onSaved={onSaved} />);
+      fireEvent.change(screen.getByLabelText(/menu_name/), { target: { value: 'Tea' } });
+      fireEvent.click(screen.getByText('cancel'));
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('common:unsaved_subject_menu_item')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'unsaved_leave' }));
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks before closing an edited item, but not when the edit is undone', () => {
+      render(<MenuFormModal item={EXISTING_ITEM as never} onClose={onClose} onSaved={onSaved} />);
+      const price = screen.getByLabelText(/menu_price/);
+      fireEvent.change(price, { target: { value: '3' } });
+      fireEvent.change(price, { target: { value: '2.5' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks when an existing item was changed', () => {
+      render(<MenuFormModal item={EXISTING_ITEM as never} onClose={onClose} onSaved={onSaved} />);
+      fireEvent.change(screen.getByLabelText(/menu_name/), { target: { value: 'Ristretto' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('unsaved_title')).toBeInTheDocument();
+    });
+  });
+
   it('pre-fills form fields in edit mode', () => {
     render(<MenuFormModal item={EXISTING_ITEM as never} onClose={onClose} onSaved={onSaved} />);
 

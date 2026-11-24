@@ -10,6 +10,7 @@ import { MaterialIcon } from '../../components/MaterialIcon';
 import { fbService } from '../../services';
 import { stayService } from '../../services';
 import { useToastStore } from '../../store';
+import { useDiscardGuard } from '../../hooks/useDiscardGuard';
 import { getErrorMessage } from '../../utils';
 import type { MenuItemResponse } from '../../types';
 import type { StayResponse } from '../../types';
@@ -91,6 +92,9 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
   const [loading, setLoading] = useState(false);
   const [loadingMenu, setLoadingMenu] = useState(true);
   const [stayIdError, setStayIdError] = useState('');
+
+  const hasOrderStarted = stayId !== '' || Object.keys(quantities).length > 0;
+  const { requestClose, discardDialog } = useDiscardGuard(hasOrderStarted && !loading, t('unsaved_subject_order'), onClose);
 
   useEffect(() => {
     fbService
@@ -177,11 +181,12 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
   );
 
   return (
+    <>
     <M3Dialog
       open
       title={t('order_form_title')}
       titleId="order-form-modal-title"
-      onClose={onClose}
+      onClose={requestClose}
     >
       <form onSubmit={handleSubmit} className="space-y-5" noValidate>
         <div>
@@ -243,7 +248,7 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <M3Button type="button" variant="outlined" onClick={onClose} disabled={loading}>
+          <M3Button type="button" variant="outlined" onClick={requestClose} disabled={loading}>
             {t('cancel')}
           </M3Button>
           <M3Button type="submit" loading={loading} icon="restaurant_menu">
@@ -252,6 +257,8 @@ export const OrderFormModal = memo(({ onClose, onCreated }: Props) => {
         </div>
       </form>
     </M3Dialog>
+    {discardDialog}
+    </>
   );
 });
 

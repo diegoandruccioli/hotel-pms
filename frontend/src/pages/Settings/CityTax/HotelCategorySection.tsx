@@ -12,6 +12,7 @@ import { M3Table, M3TableRow, M3TableCell } from '../../../components/m3';
 import { M3TextField } from '../../../components/m3';
 import { useToastStore } from '../../../store';
 import { getErrorMessage } from '../../../utils';
+import { useUnsavedChangesGuard } from '../../../hooks/useUnsavedChangesGuard';
 import { CATEGORY_MAX_LENGTH, zodFieldErrors } from './cityTaxForm';
 
 const EMPTY_CATEGORY_FORM: HotelCategoryHistoryRequest = { category: '', validFrom: '' };
@@ -34,6 +35,10 @@ export const HotelCategorySection = () => {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [formData, setFormData] = useState<HotelCategoryHistoryRequest>(EMPTY_CATEGORY_FORM);
+  useUnsavedChangesGuard(
+    !saving && JSON.stringify(formData) !== JSON.stringify(EMPTY_CATEGORY_FORM),
+    t('common:unsaved_subject_hotel_category'),
+  );
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const loadHistory = useCallback(async () => {

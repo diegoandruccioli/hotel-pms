@@ -69,6 +69,48 @@ describe('OrderFormModal', () => {
     });
   });
 
+  describe('unsaved changes guard', () => {
+    it('closes at once when nothing was chosen', async () => {
+      vi.mocked(fbService.getMenuItems).mockResolvedValueOnce(MENU_ITEMS);
+      render(<OrderFormModal onClose={onClose} onCreated={onCreated} />);
+      await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks before closing once an item was added, naming the order', async () => {
+      vi.mocked(fbService.getMenuItems).mockResolvedValueOnce(MENU_ITEMS);
+      render(<OrderFormModal onClose={onClose} onCreated={onCreated} />);
+      await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: 'increase_quantity Espresso' }));
+      fireEvent.click(screen.getByRole('button', { name: 'cancel' }));
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByText('unsaved_subject_order')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'unsaved_leave' }));
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+
+    it('asks once a room was chosen', async () => {
+      vi.mocked(fbService.getMenuItems).mockResolvedValueOnce(MENU_ITEMS);
+      render(<OrderFormModal onClose={onClose} onCreated={onCreated} />);
+      await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+      fireEvent.change(screen.getByLabelText(/room_label/i), { target: { value: 'stay-uuid-1' } });
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('does not ask when the quantity is taken back to zero', async () => {
+      vi.mocked(fbService.getMenuItems).mockResolvedValueOnce(MENU_ITEMS);
+      render(<OrderFormModal onClose={onClose} onCreated={onCreated} />);
+      await waitFor(() => expect(screen.getByText('Espresso')).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: 'increase_quantity Espresso' }));
+      fireEvent.click(screen.getByRole('button', { name: 'decrease_quantity Espresso' }));
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(onClose).toHaveBeenCalledOnce();
+    });
+  });
+
   it('should call createOrder with correct payload on valid submit', async () => {
     vi.mocked(fbService.getMenuItems).mockResolvedValueOnce(MENU_ITEMS);
     vi.mocked(fbService.createOrder).mockResolvedValueOnce({} as never);

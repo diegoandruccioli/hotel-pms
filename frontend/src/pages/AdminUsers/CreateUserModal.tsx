@@ -7,6 +7,8 @@ import { M3Dialog } from '../../components/m3';
 import { M3TextField } from '../../components/m3';
 import { M3Select } from '../../components/m3';
 import { getErrorMessage } from '../../utils';
+import { useSnapshotDirty } from '../../hooks/useSnapshotDirty';
+import { useDiscardGuard } from '../../hooks/useDiscardGuard';
 import type { Role } from '../../types';
 
 interface CreateUserModalProps {
@@ -21,6 +23,9 @@ export const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProp
   const [form, setForm] = useState<CreateUserRequest>(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const { dirty } = useSnapshotDirty(JSON.stringify(form), true);
+  const { requestClose, discardDialog } = useDiscardGuard(dirty && !loading, t('common:unsaved_subject_user'), onClose);
 
   const handleUsername = useCallback((e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, username: e.target.value })), []);
@@ -56,14 +61,15 @@ export const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProp
   ], [t]);
 
   return (
+    <>
     <M3Dialog
       open
       title={t('modal_create_title')}
       titleId="create-user-title"
-      onClose={onClose}
+      onClose={requestClose}
       footer={
         <div className="flex justify-end gap-2">
-          <M3Button variant="text" onClick={onClose} disabled={loading}>{t('btn_cancel')}</M3Button>
+          <M3Button variant="text" onClick={requestClose} disabled={loading}>{t('btn_cancel')}</M3Button>
           <M3Button form="create-user-form" type="submit" loading={loading} disabled={loading}>{t('btn_create')}</M3Button>
         </div>
       }
@@ -96,6 +102,8 @@ export const CreateUserModal = memo(({ onClose, onCreated }: CreateUserModalProp
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
       </form>
     </M3Dialog>
+    {discardDialog}
+    </>
   );
 });
 CreateUserModal.displayName = 'CreateUserModal';

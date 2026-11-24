@@ -8,6 +8,8 @@ import { M3TextField } from '../../components/m3';
 import { M3Textarea } from '../../components/m3';
 import { M3Checkbox } from '../../components/m3';
 import { getErrorMessage } from '../../utils';
+import { useSnapshotDirty } from '../../hooks/useSnapshotDirty';
+import { useDiscardGuard } from '../../hooks/useDiscardGuard';
 import type { MenuItemRequest, MenuItemResponse } from '../../types';
 
 interface Props {
@@ -29,6 +31,11 @@ export const MenuFormModal = memo(({ item, onClose, onSaved }: Props) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const isEdit = item != null;
+
+  const { dirty } = useSnapshotDirty(JSON.stringify(form), true);
+  const { requestClose, discardDialog } = useDiscardGuard(
+    dirty && !loading, t('common:unsaved_subject_menu_item'), onClose,
+  );
 
   const handleName = useCallback((e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((p) => ({ ...p, name: e.target.value })), []);
@@ -65,14 +72,15 @@ export const MenuFormModal = memo(({ item, onClose, onSaved }: Props) => {
   }, [form, isEdit, item, addToast, t, onSaved]);
 
   return (
+    <>
     <M3Dialog
       open
       title={isEdit ? t('menu_edit_item') : t('menu_add_item')}
       titleId="menu-form-title"
-      onClose={onClose}
+      onClose={requestClose}
       footer={
         <div className="flex justify-end gap-2">
-          <M3Button variant="text" onClick={onClose} disabled={loading}>{t('cancel')}</M3Button>
+          <M3Button variant="text" onClick={requestClose} disabled={loading}>{t('cancel')}</M3Button>
           <M3Button form="menu-form" type="submit" loading={loading} disabled={loading}>{t('save')}</M3Button>
         </div>
       }
@@ -95,6 +103,8 @@ export const MenuFormModal = memo(({ item, onClose, onSaved }: Props) => {
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
       </form>
     </M3Dialog>
+    {discardDialog}
+    </>
   );
 });
 MenuFormModal.displayName = 'MenuFormModal';
