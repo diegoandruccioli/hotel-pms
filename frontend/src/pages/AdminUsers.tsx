@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { SortingState } from '@tanstack/react-table';
@@ -10,6 +10,7 @@ import { M3DataTable } from '../components/m3';
 import { M3FilterChip } from '../components/m3';
 import { M3LoadingState } from '../components/m3';
 import { M3EmptyState } from '../components/m3';
+import { M3ErrorState } from '../components/m3';
 import { SettingsPageHeader } from '../components/SettingsPageHeader';
 import { useToastStore } from '../store';
 import { useAuthStore } from '../store';
@@ -60,7 +61,7 @@ export function AdminUsers() {
   const { addToast } = useToastStore();
   const currentUser = useAuthStore((s) => s.user);
   const handleBack = useCallback(() => navigate(-1), [navigate]);
-  const { data: usersData, isLoading: loading, isError: loadFailed } = useUsersList();
+  const { data: usersData, isLoading: loading, error: loadError, refetch } = useUsersList();
   const users = usersData ?? EMPTY_USERS;
   const toggleUserMutation = useToggleUserActive();
   const addUserToCache = useAddUserToCache();
@@ -82,9 +83,9 @@ export function AdminUsers() {
   const openReset = useCallback((u: UserResponse) => setResetTarget(u), []);
   const closeReset = useCallback(() => setResetTarget(null), []);
 
-  useEffect(() => {
-    if (loadFailed) addToast(t('err_load_failed'), 'error');
-  }, [loadFailed, addToast, t]);
+  // A failed refetch keeps the list already on screen; only a list never loaded gets the retry state.
+  const retryLoad = useCallback(() => { void refetch(); }, [refetch]);
+  const loadFailure = usersData === undefined && loadError ? getErrorMessage(loadError, t('users_load_hint')) : null;
 
   const handleCreated = useCallback(
     (u: UserResponse) => {
@@ -187,6 +188,13 @@ export function AdminUsers() {
 
       {loading ? (
         <M3LoadingState label={t('loading', { ns: 'common' })} />
+      ) : loadFailure !== null ? (
+        <M3ErrorState
+          title={t('users_load_title')}
+          message={loadFailure}
+          retryLabel={t('try_again', { ns: 'common' })}
+          onRetry={retryLoad}
+        />
       ) : users.length === 0 ? (
         <M3EmptyState icon="manage_accounts" title={t('no_users')} className="bg-surface rounded-shape-md shadow-elevation-1" />
       ) : (

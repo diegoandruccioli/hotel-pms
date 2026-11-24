@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { M3ConfirmDialog } from '../../components/m3';
 import { M3Dialog } from '../../components/m3';
 import { M3Button } from '../../components/m3';
 import { M3LoadingState } from '../../components/m3';
+import { M3ErrorState } from '../../components/m3';
 import { useToastStore } from '../../store';
 import { stayService } from '../../services';
 import { useAlloggiatiLookups, useStayDetail } from '../../hooks/queries';
@@ -37,7 +38,9 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
   const stati = lookups.stati.data ?? EMPTY_STATI;
   const tipdoc = lookups.tipdoc.data ?? EMPTY_TIPDOC;
   const loading = !!stayId && (stayQuery.isLoading || lookups.stati.isLoading || lookups.tipdoc.isLoading);
-  const loadError = stayQuery.error ?? lookups.stati.error ?? lookups.tipdoc.error;
+  // Only data never loaded blocks the dialog; a failed background refresh keeps what is on screen.
+  const neverLoaded = stayQuery.data === undefined || lookups.stati.data === undefined || lookups.tipdoc.data === undefined;
+  const loadError = neverLoaded ? (stayQuery.error ?? lookups.stati.error ?? lookups.tipdoc.error) : null;
 
   const [formGuest, setFormGuest] = useState<IdentifiableGuest | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -52,9 +55,13 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
   const { refetch: refetchStay } = stayQuery;
   const refreshStay = useCallback(async () => { await refetchStay(); }, [refetchStay]);
 
-  useEffect(() => {
-    if (loadError) addToast(getErrorMessage(loadError, t('err_load_guests')), 'error');
-  }, [loadError, addToast, t]);
+  const { refetch: refetchStati } = lookups.stati;
+  const { refetch: refetchTipdoc } = lookups.tipdoc;
+  const retryLoad = useCallback(() => {
+    void refetchStay();
+    void refetchStati();
+    void refetchTipdoc();
+  }, [refetchStay, refetchStati, refetchTipdoc]);
 
   const closeAndReset = useCallback(() => {
     setFormGuest(null);
@@ -212,6 +219,13 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
     >
       {loading ? (
         <M3LoadingState label={t('loading')} />
+      ) : loadError ? (
+        <M3ErrorState
+          title={t('guests_load_title')}
+          message={getErrorMessage(loadError, t('guests_load_hint'))}
+          retryLabel={t('common:try_again')}
+          onRetry={retryLoad}
+        />
       ) : (
         <div className="space-y-4">
           {!formGuest && guests.map((guest) => (
