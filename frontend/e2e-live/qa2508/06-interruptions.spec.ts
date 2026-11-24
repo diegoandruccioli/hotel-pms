@@ -149,6 +149,9 @@ test.describe('Blocco 6 — interruptions', () => {
       extraAllow: [
         { pattern: /401.*\/api\/v1\/guests/, reason: 'expected: session expired deliberately for this test', scope: 'http_error' },
         { pattern: /401.*\/api\/v1\/auth\/refresh/, reason: 'expected: refresh also fails once refresh_token is gone', scope: 'http_error' },
+        // After the redirect to /login the app checks the session once (App.tsx initAuth -> /auth/me); with the
+        // cookies gone that is a 401. Whether it lands before or after the checkpoint is a race, so it is not a finding.
+        { pattern: /401.*\/api\/v1\/auth\/me/, reason: 'expected: the post-redirect session check answers 401, timing varies', scope: 'http_error' },
         { pattern: /401 \(Unauthorized\)/, reason: 'expected: session expired', scope: 'console' },
       ],
     });

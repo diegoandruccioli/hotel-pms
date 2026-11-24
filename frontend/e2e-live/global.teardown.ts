@@ -2,6 +2,7 @@ import { test as teardown } from '@playwright/test';
 import type { APIRequestContext } from '@playwright/test';
 import { csrfHeader } from './fixtures/api';
 import { LIVE_ADMIN, OTHER_HOTEL_ADMIN } from './fixtures/hotel';
+import { isFixtureGuest } from './fixtures/fixtureGuests';
 
 // Runs once after every "live" spec (even failed ones). createCleanRoom() makes a new
 // E2E-LIVE-<timestamp> room per call and many specs leave the stay they open checked-in, so the
@@ -20,10 +21,13 @@ import { LIVE_ADMIN, OTHER_HOTEL_ADMIN } from './fixtures/hotel';
 // - It scans by prefix, so it also cleans what an interrupted earlier run left behind.
 // - Cleans both tenants the suite writes to: the live-suite hotel (E2E-LIVE-*) and the second
 //   tenant used by the cross-tenant specs (QA-OTHER-*, qa-fiscal-settings-matrix).
-// Soft delete only; touches nothing but rooms carrying those fixture prefixes.
+// Soft delete only; touches nothing but rooms carrying those fixture prefixes and, in the live-suite
+// hotel, the guests whose e-mail is one the specs generate (anonymised, see cleanGuests).
 const FIXTURE_PREFIX = 'E2E-LIVE-';
 const OTHER_HOTEL_PREFIX = 'QA-OTHER-';
 const PAGE_SIZE = 200;
+// DELETE /guests/{id}: 404 already gone, 409 active reservation, 451 legal hold.
+const GUEST_REFUSALS = new Set([404, 409, 451]);
 const CENTS = 100;
 // Statuses the reservations page lets you delete, and the ones that block deleting a room.
 const DELETABLE_RESERVATION_STATUSES = new Set(['PENDING', 'CONFIRMED']);
@@ -135,6 +139,45 @@ async function cleanTenant(
     }
 }
 
+interface GuestRow { id: string; email?: string | null; firstName?: string; lastName?: string }
+
+/**
+ * Anonymises the guests the specs created (matched on their fixture e-mail, see isFixtureGuest).
+ * DELETE /guests/{id} is the GDPR anonymisation: irreversible, refused with 409 while the guest has an
+ * active reservation and with 451 under a legal hold. Those refusals are reported, not failures.
+ * TEARDOWN_GUESTS_DRY_RUN=1 only lists what would be touched.
+ */
+async function cleanGuests(request: APIRequestContext, label: string, credentials: { username: string; password: string }): Promise<void> {
+    const login = await request.post('/api/v1/auth/login', { data: credentials });
+    if (login.status() !== 200) {
+        throw new Error(`[teardown] ${label}: login failed (${login.status()}), fixture guests were not cleaned up`);
+    }
+    const headers = await csrfHeader(request);
+    const fixtureGuests = (await listAll<GuestRow>(request, '/api/v1/guests')).filter((g) => isFixtureGuest(g.email));
+
+    if (process.env.TEARDOWN_GUESTS_DRY_RUN === '1') {
+        console.log(`[teardown] ${label}: DRY RUN, ${fixtureGuests.length} fixture guest(s) would be anonymised`);
+        for (const g of fixtureGuests) console.log(`[teardown]   ${g.id} | ${g.firstName} ${g.lastName} | ${g.email}`);
+        return;
+    }
+
+    const statuses = new Map<number, number>();
+    const refused: string[] = [];
+    const failed: string[] = [];
+    for (const g of fixtureGuests) {
+        const response = await request.delete(`/api/v1/guests/${g.id}`, { headers });
+        statuses.set(response.status(), (statuses.get(response.status()) ?? 0) + 1);
+        if (response.status() === 204) continue;
+        const line = `guest ${g.id}: ${response.status()} ${await response.text()}`;
+        (GUEST_REFUSALS.has(response.status()) ? refused : failed).push(line);
+    }
+    console.log(`[teardown] ${label}: anonymised ${statuses.get(204) ?? 0} of ${fixtureGuests.length} fixture guests`);
+    for (const line of [...refused, ...failed]) console.warn(`[teardown] ${label}: left in place: ${line}`);
+    if (failed.length > 0) {
+        throw new Error(`[teardown] ${label}: some guest deletes failed, status counts: ${JSON.stringify([...statuses])}`);
+    }
+}
+
 teardown('remove the fixture rooms of both tenants', async ({ request, playwright, baseURL }) => {
     teardown.setTimeout(300_000);
     const failures: string[] = [];
@@ -147,6 +190,8 @@ teardown('remove the fixture rooms of both tenants', async ({ request, playwrigh
     };
 
     await run('live-suite hotel', () => cleanTenant(request, 'live-suite hotel', LIVE_ADMIN, FIXTURE_PREFIX));
+    // After the rooms: their stays and reservations are closed by then, so the guests are free to go.
+    await run('live-suite hotel guests', () => cleanGuests(request, 'live-suite hotel', LIVE_ADMIN));
 
     // The second tenant only exists on a stack seeded with the e2e fixtures: when its admin cannot
     // log in there is nothing of ours to clean, so that is a skip, not a failure.
