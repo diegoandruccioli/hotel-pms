@@ -94,7 +94,7 @@ Ogni regola ha: **Regola** · **Perché** · **Come** · **Verifica**.
   - Errori di campo *accanto al campo*; il riepilogo in cima può esistere ma non è mai l'unico segnale.
   - Il codice interno o l'id di correlazione vanno nei log, non nel messaggio.
   - Stato vuoto = `M3EmptyState` con `description` e `action`: *"Nessuna camera in questo stato. Mostra tutte le camere."* Con filtro attivo il vuoto propone di rimuovere il filtro.
-  - Errore di caricamento = `M3ErrorState` con "Riprova".
+  - Errore di caricamento = `M3ErrorState` con "Riprova". Il titolo è un h2 (errore a pagina intera, subito sotto l'h1); dentro una sezione con h2 o una modale si passa `headingLevel={3}`.
   - Colori: giallo/avviso per ciò che non è un guasto; rosso solo per ciò che lo è (e mai da solo, vedi R11).
   - Servizi sensibili: un messaggio che rivela se un'email è registrata è un compromesso con la sicurezza; in caso di dubbio, neutro.
 - **Verifica.** Se il messaggio comparisse da solo su uno schermo, l'utente saprebbe cosa fare?

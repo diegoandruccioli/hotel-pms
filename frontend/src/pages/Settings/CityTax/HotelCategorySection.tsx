@@ -145,6 +145,7 @@ export const HotelCategorySection = () => {
       ) : loadError !== null ? (
         <M3ErrorState
           title={t('city_tax_category_load_title')}
+          headingLevel={3}
           message={loadError}
           retryLabel={t('common:try_again')}
           onRetry={loadHistory}

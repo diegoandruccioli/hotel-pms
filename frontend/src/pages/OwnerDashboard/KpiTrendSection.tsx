@@ -84,6 +84,7 @@ export const KpiTrendSection = ({ startDate, endDate, formatCurrency, formatDate
       ) : isError ? (
         <M3ErrorState
           title={t('err_kpi_load_failed')}
+          headingLevel={3}
           message={getErrorMessage(error, t('err_kpi_load_failed'))}
           retryLabel={t('try_again')}
           onRetry={refetch}

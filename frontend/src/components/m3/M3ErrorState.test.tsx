@@ -36,6 +36,29 @@ describe('M3ErrorState', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
+  it('renders the title as an h2 by default, so it sits right under a page h1', async () => {
+    const { container } = render(
+      <main>
+        <h1>Page</h1>
+        <M3ErrorState title="Error loading guests" message="Network error" />
+      </main>,
+    );
+    expect(screen.getByRole('heading', { level: 2, name: 'Error loading guests' })).toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('renders the title as an h3 when headingLevel is 3, under a section h2', async () => {
+    const { container } = render(
+      <main>
+        <h1>Page</h1>
+        <h2>Section</h2>
+        <M3ErrorState title="Error loading guests" message="Network error" headingLevel={3} />
+      </main>,
+    );
+    expect(screen.getByRole('heading', { level: 3, name: 'Error loading guests' })).toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
   it('has no accessibility violations', async () => {
     const { container } = render(
       <M3ErrorState title="Error loading guests" message="Network error" retryLabel="Try again" onRetry={vi.fn()} />,

@@ -69,7 +69,7 @@ describe('RateSeasonManagerModal', () => {
     vi.mocked(rateSeasonService.listSeasons).mockRejectedValue(new Error('boom'));
     render(<RateSeasonManagerModal roomType={ROOM_TYPE} onClose={onClose} />);
     const alert = await screen.findByRole('alert');
-    expect(within(alert).getByText('rate_seasons_load_title')).toBeInTheDocument();
+    expect(within(alert).getByRole('heading', { level: 3, name: 'rate_seasons_load_title' })).toBeInTheDocument();
     expect(within(alert).getByText('rate_seasons_load_hint')).toBeInTheDocument();
     expect(screen.queryByText('no_rate_seasons')).not.toBeInTheDocument();
     expect(screen.queryByText('add_rate_season')).not.toBeInTheDocument();

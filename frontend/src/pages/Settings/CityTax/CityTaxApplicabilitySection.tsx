@@ -68,6 +68,7 @@ export const CityTaxApplicabilitySection = () => {
       ) : loadError !== null ? (
         <M3ErrorState
           title={t('city_tax_applicability_load_title')}
+          headingLevel={3}
           message={loadError}
           retryLabel={t('common:try_again')}
           onRetry={loadApplicability}

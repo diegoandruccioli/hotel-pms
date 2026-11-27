@@ -68,6 +68,7 @@ describe('SettingsPrivacy', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('privacy_load_title');
+    expect(screen.getByRole('heading', { level: 3, name: 'privacy_load_title' })).toBeInTheDocument();
     expect(alert).toHaveTextContent('INTERNAL_SERVER_ERROR');
     expect(mockAddToast).not.toHaveBeenCalled();
 

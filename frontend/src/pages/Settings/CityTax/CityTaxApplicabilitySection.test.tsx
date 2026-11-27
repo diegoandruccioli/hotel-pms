@@ -42,6 +42,7 @@ describe('CityTaxApplicabilitySection', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('city_tax_applicability_load_title');
+    expect(screen.getByRole('heading', { level: 3, name: 'city_tax_applicability_load_title' })).toBeInTheDocument();
     expect(alert).toHaveTextContent('INTERNAL_SERVER_ERROR');
     expect(screen.queryByLabelText(SELECT_LABEL)).not.toBeInTheDocument();
     expect(mockAddToast).not.toHaveBeenCalled();

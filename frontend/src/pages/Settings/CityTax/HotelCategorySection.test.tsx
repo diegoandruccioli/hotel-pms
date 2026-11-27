@@ -48,6 +48,7 @@ describe('HotelCategorySection', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('city_tax_category_load_title');
+    expect(screen.getByRole('heading', { level: 3, name: 'city_tax_category_load_title' })).toBeInTheDocument();
     expect(screen.queryByText('city_tax_no_category_history')).not.toBeInTheDocument();
     expect(mockAddToast).not.toHaveBeenCalled();
 
