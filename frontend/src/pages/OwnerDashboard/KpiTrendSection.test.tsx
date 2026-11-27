@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { KpiTrendSection } from './KpiTrendSection';
 import { kpiReportService } from '../../services';
@@ -79,6 +79,14 @@ describe('KpiTrendSection', () => {
     renderSection();
 
     await waitFor(() => expect(screen.getAllByText('err_kpi_load_failed').length).toBeGreaterThan(0));
+  });
+
+  it('keeps the load error title one level below the section heading', async () => {
+    vi.mocked(kpiReportService.getKpiReport).mockRejectedValueOnce(new Error('boom'));
+    renderSection();
+
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByRole('heading', { level: 3 })).toBeInTheDocument();
   });
 
   it('refetches with the newly selected granularity', async () => {

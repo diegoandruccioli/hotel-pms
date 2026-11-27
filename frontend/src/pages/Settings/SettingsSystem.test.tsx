@@ -64,6 +64,7 @@ describe('SettingsSystem', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('settings_system_load_title');
     expect(alert).toHaveTextContent('settings_system_load_failed');
+    expect(screen.getByRole('heading', { level: 3, name: 'settings_system_load_title' })).toBeInTheDocument();
     expect(screen.queryAllByRole('switch')).toHaveLength(0);
     expect(screen.queryByLabelText('email_greeting_label')).not.toBeInTheDocument();
     expect(mockAddToast).not.toHaveBeenCalled();

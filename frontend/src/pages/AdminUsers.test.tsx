@@ -293,6 +293,14 @@ describe('AdminUsers', () => {
     expect(mockAddToast).not.toHaveBeenCalled();
   });
 
+  it('puts the load failure title right under the page heading and passes axe', async () => {
+    vi.mocked(userService.listUsers).mockRejectedValue(new Error('boom'));
+    const { container } = renderAdminUsers();
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByRole('heading', { level: 2, name: 'users_load_title' })).toBeInTheDocument();
+    expect(await axe(container)).toHaveNoViolations();
+  }, 30000);
+
   it('shows the backend detail in the load failure state', async () => {
     vi.mocked(userService.listUsers).mockRejectedValue(mockAxiosErrorWithDetail('Servizio non raggiungibile'));
     renderAdminUsers();

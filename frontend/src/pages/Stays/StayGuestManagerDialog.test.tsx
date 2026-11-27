@@ -110,7 +110,7 @@ describe('StayGuestManagerDialog', () => {
     render(<StayGuestManagerDialog stayId={STAY_ID} onClose={vi.fn()} />);
 
     const alert = await screen.findByRole('alert');
-    expect(within(alert).getByText('guests_load_title')).toBeInTheDocument();
+    expect(within(alert).getByRole('heading', { level: 3, name: 'guests_load_title' })).toBeInTheDocument();
     expect(within(alert).getByText('guests_load_hint')).toBeInTheDocument();
     expect(screen.queryByText('btn_add_guest')).not.toBeInTheDocument();
     expect(addToastMock).not.toHaveBeenCalled();

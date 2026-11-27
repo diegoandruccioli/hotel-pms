@@ -138,6 +138,7 @@ export const SettingsSystem = () => {
       {loadError !== null ? (
         <M3ErrorState
           title={t('settings_system_load_title')}
+          headingLevel={3}
           message={loadError}
           retryLabel={t('common:try_again')}
           onRetry={loadSettings}

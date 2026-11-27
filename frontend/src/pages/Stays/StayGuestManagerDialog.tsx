@@ -222,6 +222,7 @@ export const StayGuestManagerDialog = memo(({ stayId, onClose }: StayGuestManage
       ) : loadError ? (
         <M3ErrorState
           title={t('guests_load_title')}
+          headingLevel={3}
           message={getErrorMessage(loadError, t('guests_load_hint'))}
           retryLabel={t('common:try_again')}
           onRetry={retryLoad}
