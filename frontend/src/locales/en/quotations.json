@@ -99,5 +99,5 @@
   "send_dialog_loading": "Looking up the email address…",
   "send_dialog_no_email": "{{name}} has no email address. Add one in the guest's record and try again.",
   "send_dialog_open_guest": "Open guest record",
-  "send_dialog_guest_unreadable": "Could not look up the guest's email address. Try again shortly."
+  "send_dialog_guest_unreadable": "We couldn't look up the guest's email address."
 }

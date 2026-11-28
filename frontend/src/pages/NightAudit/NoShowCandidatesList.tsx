@@ -87,7 +87,7 @@ CandidateRow.displayName = 'CandidateRow';
 export const NoShowCandidatesList = ({ businessDate }: { businessDate: string }) => {
   const { t } = useTranslation('common');
   const addToast = useToastStore((s) => s.addToast);
-  const { candidates, total, isLoading, error } = useNoShowCandidates(businessDate);
+  const { candidates, total, isLoading, error, refetch } = useNoShowCandidates(businessDate);
   const { data: rooms } = useRoomsLookup();
   const queryClient = useQueryClient();
   const statusMutation = useUpdateReservationStatus();
@@ -127,8 +127,14 @@ export const NoShowCandidatesList = ({ businessDate }: { businessDate: string })
   if (isLoading) return <M3LoadingState label={t('loading')} />;
   if (error) {
     return (
-      <Alert tone="error">
-        {t('night_audit_noshows_load_failed')} {getErrorMessage(error, '')}
+      <Alert
+        tone="error"
+        title={t('night_audit_noshows_load_title')}
+        retryLabel={t('try_again')}
+        onRetry={refetch}
+      >
+        <p>{getErrorMessage(error, t('night_audit_noshows_load_hint'))}</p>
+        <p>{t('night_audit_noshows_can_still_run')}</p>
       </Alert>
     );
   }

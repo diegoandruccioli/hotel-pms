@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Alert } from '../../components/Alert';
@@ -6,7 +6,7 @@ import { M3LoadingState } from '../../components/m3';
 import { M3StatusChip } from '../../components/m3';
 import { useFormatters } from '../../hooks';
 import { useGuestInvoiceHistory, useGuestStayHistory, useRoomsLookup } from '../../hooks/queries';
-import { cn, EMPTY_PLACEHOLDER, invoiceStatusTone, stayStatusTone } from '../../utils';
+import { cn, EMPTY_PLACEHOLDER, getErrorMessage, invoiceStatusTone, stayStatusTone } from '../../utils';
 
 const HISTORY_LIMIT = 5;
 
@@ -55,10 +55,35 @@ interface HistoryProps {
   guestId: string;
 }
 
+interface HistoryLoadErrorProps {
+  error: unknown;
+  refetch: () => Promise<unknown>;
+}
+
+/** A history that could not be read: says so, why when the server told, and offers a retry. */
+const HistoryLoadError = ({ error, refetch }: HistoryLoadErrorProps) => {
+  const { t } = useTranslation(['guests', 'common']);
+  const handleRetry = useCallback(() => {
+    void refetch();
+  }, [refetch]);
+
+  return (
+    <Alert
+      tone="error"
+      compact
+      title={t('history_load_title')}
+      retryLabel={t('common:try_again')}
+      onRetry={handleRetry}
+    >
+      {getErrorMessage(error, t('history_load_hint'))}
+    </Alert>
+  );
+};
+
 export const StayHistorySection = ({ guestId }: HistoryProps) => {
   const { t } = useTranslation(['guests', 'common']);
   const { formatDate } = useFormatters();
-  const { data, isLoading, isError } = useGuestStayHistory(guestId);
+  const { data, isLoading, isError, error, refetch } = useGuestStayHistory(guestId);
   const { data: rooms } = useRoomsLookup();
   const roomNumbers = useMemo(() => new Map((rooms ?? []).map((r) => [r.id, r.roomNumber])), [rooms]);
 
@@ -67,7 +92,7 @@ export const StayHistorySection = ({ guestId }: HistoryProps) => {
       {isLoading ? (
         <M3LoadingState plain label={t('common:loading')} />
       ) : isError ? (
-        <Alert tone="error" compact>{t('err_history_load')}</Alert>
+        <HistoryLoadError error={error} refetch={refetch} />
       ) : !data?.length ? (
         <p className="text-sm text-on-surface-variant">{t('msg_no_stays')}</p>
       ) : (
@@ -100,14 +125,14 @@ export const StayHistorySection = ({ guestId }: HistoryProps) => {
 export const InvoiceHistorySection = ({ guestId }: HistoryProps) => {
   const { t } = useTranslation(['guests', 'common']);
   const { formatDate, formatCurrency } = useFormatters();
-  const { data, isLoading, isError } = useGuestInvoiceHistory(guestId);
+  const { data, isLoading, isError, error, refetch } = useGuestInvoiceHistory(guestId);
 
   return (
     <DetailSection heading={t('section_invoice_history')}>
       {isLoading ? (
         <M3LoadingState plain label={t('common:loading')} />
       ) : isError ? (
-        <Alert tone="error" compact>{t('err_history_load')}</Alert>
+        <HistoryLoadError error={error} refetch={refetch} />
       ) : !data?.length ? (
         <p className="text-sm text-on-surface-variant">{t('msg_no_invoices')}</p>
       ) : (

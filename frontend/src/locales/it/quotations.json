@@ -99,5 +99,5 @@
   "send_dialog_loading": "Recupero dell'indirizzo email…",
   "send_dialog_no_email": "{{name}} non ha un indirizzo email. Aggiungilo nella scheda dell'ospite e riprova.",
   "send_dialog_open_guest": "Apri scheda ospite",
-  "send_dialog_guest_unreadable": "Impossibile recuperare l'indirizzo email dell'ospite. Riprova tra poco."
+  "send_dialog_guest_unreadable": "Non siamo riusciti a recuperare l'indirizzo email dell'ospite."
 }

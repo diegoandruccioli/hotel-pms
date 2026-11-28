@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useReservationsSearch } from '../../hooks/queries';
 import type { ReservationResponse } from '../../types';
 
@@ -33,8 +33,16 @@ export function useNoShowCandidates(businessDate: string) {
   );
   const total = (pending.data?.totalElements ?? 0) + (confirmed.data?.totalElements ?? 0);
 
+  const { refetch: refetchPending } = pending;
+  const { refetch: refetchConfirmed } = confirmed;
+  const refetch = useCallback(() => {
+    void refetchPending();
+    void refetchConfirmed();
+  }, [refetchPending, refetchConfirmed]);
+
   return {
     candidates,
+    refetch,
     total,
     // placeholderData keeps the previous date's rows while the new date loads: not trustworthy yet.
     isLoading: enabled && (pending.isLoading || confirmed.isLoading || pending.isPlaceholderData || confirmed.isPlaceholderData),
