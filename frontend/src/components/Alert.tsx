@@ -16,6 +16,9 @@ interface AlertProps {
   action?: ReactNode;
   /** Smaller padding and text, for banners squeezed inside a section. */
   compact?: boolean;
+  /** With `retryLabel`, a text button under the message, for a failed load the user can retry. */
+  onRetry?: () => void;
+  retryLabel?: string;
   /** `alert` interrupts the screen reader and is the default for errors;
    * `status` is polite and the default for everything else. */
   role?: 'alert' | 'status';
@@ -40,6 +43,8 @@ export const Alert = ({
   title,
   action,
   compact = false,
+  onRetry,
+  retryLabel,
   role,
   className,
   children,
@@ -57,6 +62,15 @@ export const Alert = ({
     <div className="min-w-0 flex-1">
       {title && <p className="font-medium">{title}</p>}
       {children}
+      {onRetry && retryLabel && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-1 flex w-fit items-center min-h-11 sm:pointer-fine:min-h-10 font-medium underline hover:no-underline"
+        >
+          {retryLabel}
+        </button>
+      )}
     </div>
     {action}
   </div>

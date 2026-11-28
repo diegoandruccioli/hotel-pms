@@ -105,6 +105,19 @@ describe('QuotationSendDialog', () => {
     expect(screen.queryByRole('link', { name: 'send_dialog_open_guest' })).not.toBeInTheDocument();
   });
 
+  it('retries the guest lookup and enables the send once the address is read', async () => {
+    vi.mocked(guestService.getGuestById)
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValue({ id: 'g1', email: 'mario.rossi@example.com' } as never);
+    renderDialog(GUEST_QUOTATION);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'common:try_again' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'send_dialog_confirm' })).toBeEnabled());
+    expect(guestService.getGuestById).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('send_dialog_guest_unreadable')).not.toBeInTheDocument();
+  });
+
   it('uses the resend wording for a quotation that was already sent', async () => {
     renderDialog({ ...PROSPECT_QUOTATION, status: 'SENT' } as QuotationResponse);
 

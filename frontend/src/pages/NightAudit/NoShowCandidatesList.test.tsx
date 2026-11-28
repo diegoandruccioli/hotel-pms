@@ -96,6 +96,32 @@ describe('NoShowCandidatesList', () => {
     vi.mocked(reservationService.searchReservations).mockRejectedValue(new Error('boom'));
     render(<NoShowCandidatesList businessDate="2026-06-14" />);
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('night_audit_noshows_load_title');
+    expect(alert).toHaveTextContent('night_audit_noshows_load_hint');
+    expect(alert).toHaveTextContent('night_audit_noshows_can_still_run');
+  });
+
+  it('shows the backend detail once, without a raw code, when the search is rejected', async () => {
+    vi.mocked(reservationService.searchReservations)
+      .mockRejectedValue(mockAxiosErrorWithDetail('Servizio non raggiungibile', 503));
+    render(<NoShowCandidatesList businessDate="2026-06-14" />);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Servizio non raggiungibile');
+    expect(alert).not.toHaveTextContent('night_audit_noshows_load_hint');
+    expect(alert.textContent?.match(/Servizio non raggiungibile/g)).toHaveLength(1);
+  });
+
+  it('retries both searches from the error banner and then lists the arrivals', async () => {
+    vi.mocked(reservationService.searchReservations).mockRejectedValue(new Error('boom'));
+    render(<NoShowCandidatesList businessDate="2026-06-14" />);
+    const retry = await screen.findByRole('button', { name: 'try_again' });
+    const before = vi.mocked(reservationService.searchReservations).mock.calls.length;
+    mockSearch([], [reservation()]);
+    fireEvent.click(retry);
+    expect(await screen.findByText('Jane Doe')).toBeInTheDocument();
+    const statuses = vi.mocked(reservationService.searchReservations).mock.calls.slice(before).map(([p]) => p.status);
+    expect(statuses).toEqual(expect.arrayContaining(['PENDING', 'CONFIRMED']));
   });
 
   it('tells how many candidates are not listed', async () => {

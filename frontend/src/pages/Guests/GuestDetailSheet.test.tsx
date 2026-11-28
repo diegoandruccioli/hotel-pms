@@ -198,9 +198,28 @@ describe('GuestDetailSheet', () => {
   it('isolates a failing stay history: the error shows and the rest stays visible', async () => {
     vi.mocked(stayService.getGuestStayHistory).mockRejectedValue(new Error('boom'));
     renderSheet();
-    expect(await screen.findByText('err_history_load')).toBeInTheDocument();
+    expect(await screen.findByText('history_load_title')).toBeInTheDocument();
+    expect(screen.getByText('history_load_hint')).toBeInTheDocument();
     expect(screen.getByText('Rossi Mario')).toBeInTheDocument();
     expect(await screen.findByText('INV-001')).toBeInTheDocument();
+  });
+
+  it('retries the stay history from the error banner', async () => {
+    vi.mocked(stayService.getGuestStayHistory).mockRejectedValueOnce(new Error('boom'));
+    renderSheet();
+    fireEvent.click(await screen.findByRole('button', { name: 'common:try_again' }));
+    await waitFor(() => expect(stayService.getGuestStayHistory).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByText('history_load_title')).not.toBeInTheDocument());
+    expect(billingService.getGuestInvoiceHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries the invoice history from the error banner', async () => {
+    vi.mocked(billingService.getGuestInvoiceHistory).mockRejectedValueOnce(new Error('boom'));
+    renderSheet();
+    fireEvent.click(await screen.findByRole('button', { name: 'common:try_again' }));
+    expect(await screen.findByText('INV-001')).toBeInTheDocument();
+    expect(billingService.getGuestInvoiceHistory).toHaveBeenCalledTimes(2);
+    expect(stayService.getGuestStayHistory).toHaveBeenCalledTimes(1);
   });
 
   it('links each stay to its reservation, and leaves a walk-in stay without a link', async () => {
@@ -240,7 +259,7 @@ describe('GuestDetailSheet', () => {
   it('isolates a failing invoice history', async () => {
     vi.mocked(billingService.getGuestInvoiceHistory).mockRejectedValue(new Error('boom'));
     renderSheet();
-    expect(await screen.findByText('err_history_load')).toBeInTheDocument();
+    expect(await screen.findByText('history_load_title')).toBeInTheDocument();
     expect(await screen.findAllByText('label_room:204')).toHaveLength(2);
   });
 

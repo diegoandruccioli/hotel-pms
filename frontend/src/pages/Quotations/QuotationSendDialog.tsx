@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { QuotationResponse } from '../../types';
@@ -32,6 +32,10 @@ export const QuotationSendDialog = ({ quotation, onConfirm, onCancel, loading = 
   const email = guestId ? guest.data?.email?.trim() : quotation.prospectEmail?.trim();
   const lookingUp = !!guestId && guest.isPending;
   const lookupFailed = !!guestId && guest.isError;
+  const { refetch: refetchGuest } = guest;
+  const retryLookup = useCallback(() => {
+    void refetchGuest();
+  }, [refetchGuest]);
   const missingEmail = !lookingUp && !lookupFailed && !email;
 
   const footer = (
@@ -55,7 +59,11 @@ export const QuotationSendDialog = ({ quotation, onConfirm, onCancel, loading = 
     >
       {lookingUp && <p className="text-sm font-body text-on-surface-variant">{t('send_dialog_loading')}</p>}
 
-      {lookupFailed && <Alert tone="warning">{t('send_dialog_guest_unreadable')}</Alert>}
+      {lookupFailed && (
+        <Alert tone="warning" retryLabel={t('common:try_again')} onRetry={retryLookup}>
+          {t('send_dialog_guest_unreadable')}
+        </Alert>
+      )}
 
       {missingEmail && (
         <Alert

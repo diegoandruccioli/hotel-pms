@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { axe } from 'vitest-axe';
 import { Alert } from './Alert';
 
@@ -60,6 +60,36 @@ describe('Alert', () => {
   it('appends a custom className', () => {
     render(<Alert tone="error" className="mt-4">x</Alert>);
     expect(screen.getByRole('alert')).toHaveClass('mt-4');
+  });
+
+  it('offers a retry button that calls onRetry once', () => {
+    const onRetry = vi.fn();
+    render(<Alert tone="error" retryLabel="Try again" onRetry={onRetry}>Could not load</Alert>);
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows no retry button without both onRetry and retryLabel', () => {
+    const { rerender } = render(<Alert tone="error" onRetry={vi.fn()}>x</Alert>);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    rerender(<Alert tone="error" retryLabel="Try again">x</Alert>);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('gives the retry button a 44 px touch target (40 px with a mouse)', () => {
+    render(<Alert tone="error" retryLabel="Try again" onRetry={vi.fn()}>x</Alert>);
+    const retry = screen.getByRole('button', { name: 'Try again' });
+    expect(retry.className).toContain('min-h-11');
+    expect(retry.className).toContain('sm:pointer-fine:min-h-10');
+  });
+
+  it('has no accessibility violations with a retry button, also when compact', async () => {
+    const { container } = render(
+      <Alert tone="error" compact title="We couldn't load it" retryLabel="Try again" onRetry={vi.fn()}>
+        Check the connection and try again.
+      </Alert>,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 
   it('has no accessibility violations', async () => {
